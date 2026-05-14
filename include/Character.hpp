@@ -27,7 +27,7 @@ public:
     [[nodiscard]] bool GetVisibility() const { return m_Visible; }
 
     void SetImage(const std::string& ImagePath);
-
+    void SetScale(const glm::vec2& scale) { m_Transform.scale = scale; }
     void SetPosition(const glm::vec2& Position) { m_Transform.translation = Position; }
     virtual void Update(const std::vector<std::shared_ptr<Block>>& blocks) = 0;
     //碰撞機制

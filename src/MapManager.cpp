@@ -3,46 +3,121 @@
 #include <fstream>
 #include <sstream>
 #include <ImageManager.hpp>
-std::vector<std::shared_ptr<Block>> MapManager::LoadMap(const std::string& filePath)
+#include "EventBlock.hpp"
+#include "Enemy.hpp"
+
+
+LevelDate MapManager::LoadMap(const std::string& filePath)
 {
-    std::vector<std::shared_ptr<Block>> blocks;
+    LevelDate level;
     std::ifstream file(filePath);
     if (!file.is_open())
     {
         LOG_ERROR("fuck cant open"+filePath);
-        return blocks;
+        return level;
     }
     std::string line;
     int row=0;
-    const float BLOCK_SIZE=30.0f;
+    const float BLOCK_SIZE=29.0f;
     float startX=-625.0f;
-    float startY=100.0f;
+    float startY=195.0f;
 
     while (std::getline(file,line))
     {
         std::stringstream ss(line);
         int tileID;
         int col=0;
+
         while (ss>>tileID)
         {
-            std::string imageKey;
+            glm::vec2 pos = {startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)};
             if (tileID!=0)
             {
                 switch (tileID)
                 {
-                case 5:
-                    imageKey="brick_5";
-                    break;
-                case 6:
-                    imageKey="brick_6";
-                    break;
+                case 1:{
+                        auto block = std::make_shared<Block>("brick_1");
+                        block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        level.blocks.push_back(block);
+                        block->SetBreakable(true);
+                        break;
 
-                    default:
-                    imageKey="block";
                 }
-                auto block = std::make_shared<Block>(imageKey);
-                block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
-                blocks.push_back(block);
+                case 2:{
+                        auto block = std::make_shared<Block>("brick_2");
+                        block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        level.blocks.push_back(block);
+                        break;
+
+                }
+                case 3:{
+                        auto block = std::make_shared<Block>("brick_3");
+                        block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        level.blocks.push_back(block);
+                        break;
+
+                }
+                case 4:{
+                        auto block = std::make_shared<Block>("brick_4");
+                        block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        level.blocks.push_back(block);
+                        break;
+
+                }
+                case 5:{
+                        auto block = std::make_shared<Block>("brick_5");
+                        block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        level.blocks.push_back(block);
+                        break;
+
+                }
+                case 6:{
+                        auto block = std::make_shared<Block>("brick_6");
+                        block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        level.blocks.push_back(block);
+                        break;
+                }
+                case 50:
+                    {
+                        auto enemy=std::make_shared<Enemy>("teki_1");
+                        enemy->SetPosition(pos);
+                        level.enemies.push_back(enemy);
+                        break;
+                    }
+                case 80:
+                    {
+                        auto block = std::make_shared<Block>("mountain");
+                        block->SetPosition(pos);
+                        level.blocks.push_back(block);
+                        break;
+                    }
+                case 91:{ //會往上移
+                        auto block = std::make_shared<Block>("brick_2");
+                        block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        level.blocks.push_back(block);
+                        break;
+                }
+                case 92:{
+                        auto block = std::make_shared<EventBlock>("brick_2",tileID);
+                        block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        level.blocks.push_back(block);
+                        break;
+                }
+                case 93:{
+                        auto block = std::make_shared<Block>("brick_6");
+                        block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        level.blocks.push_back(block);
+                        break;
+                }
+                default:
+                    {
+                        auto block = std::make_shared<Block>("brick_6");
+                        block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        level.blocks.push_back(block);
+                        break;
+                    }
+                }
+
             }
             col++;
         }
@@ -50,5 +125,5 @@ std::vector<std::shared_ptr<Block>> MapManager::LoadMap(const std::string& fileP
     }
 
     file.close();
-    return blocks;
+    return level;
 }

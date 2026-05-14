@@ -3,6 +3,7 @@
 #include "Player.hpp"
 #include "pch.hpp" // IWYU pragma: export
 #include "Block.hpp"
+#include "Enemy.hpp"
 class App {
 public:
     enum class State {
@@ -25,6 +26,24 @@ private:
     std::shared_ptr<Player> m_Player;
     std::vector<std::shared_ptr<Block>> m_Blocks;
     std::shared_ptr<Util::GameObject> m_Background;
+    std::vector<std::shared_ptr<Enemy>> m_Enemies;
+
+    template<typename T>
+    void RenderWithCamera(const std::vector<std::shared_ptr<T>>& objects, float cameraX, float zoom) {
+        for (auto& obj : objects) {
+            glm::vec2 realPos = obj->GetPosition();
+
+            obj->SetPosition({(realPos.x - cameraX) * zoom, realPos.y * zoom});
+            obj->SetScale({zoom, zoom});
+
+            obj->Draw();
+
+            obj->SetPosition(realPos);
+            obj->SetScale({1.0f, 1.0f});
+        }
+    }
+
+
 };
 
 #endif

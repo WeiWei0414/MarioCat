@@ -3,13 +3,16 @@
 //
 #include "Player.hpp"
 
+#include "EventBlock.hpp"
 #include "Util/Input.hpp"
 #include "Util/Keycode.hpp"
+#include "Util/Logger.hpp"
 
 Player::Player():Character("player_idle")
 {
     m_Velocity=glm::vec2(0.0f, 0.0f);
     m_IsGrounded=false; //跳躍狀態
+
 
 }
 
@@ -24,9 +27,37 @@ bool Player::IfCollidesWithBlock(const std::shared_ptr<Block>& block) const
     bool collisionY=std::abs(m_pos.y-b_pos.y)<(m_size.y+b_size.y)/2.0f-0.1f;
     return collisionX && collisionY;
 }
-
+void Player::Die()
+{
+    if (IsInvincible()) return;
+    m_lives--;
+    if (m_lives>0)
+    {
+        SetPosition(m_LastSafePos);
+        m_Velocity={0.0f, 0.0f};
+        m_InvincibleTimer=2.0f;
+    }
+    else
+    {
+        LOG_INFO("Game over");
+    }
+}
+void Player::Bounce()
+{
+    m_Velocity.y=8.0f;
+}
 void Player::Update(const std::vector<std::shared_ptr<Block>>& blocks)
 {
+    if (m_InvincibleTimer>0.0f)
+    {
+        m_InvincibleTimer-=1.0f/60.0f;
+        int blink=static_cast<int>(m_InvincibleTimer*10);
+        SetVisible(blink%2==0);
+    }
+    else
+    {
+        SetVisible(true);
+    }
     glm::vec2 currentPos = GetPosition();
     m_IsGrounded=false;
     //x軸判斷
@@ -63,9 +94,31 @@ void Player::Update(const std::vector<std::shared_ptr<Block>>& blocks)
             if (m_Velocity.y<0.0f)
             {
                 m_IsGrounded=true;
+                SetImage("player_idle");
                 currentPos.y=block->GetPosition().y+(block->GetScaledSize().y/2.0f)+(this->GetScaledSize().y/2.0f);
-
+                m_Velocity.y=0.0f;
+                m_LastSafePos=currentPos;
             }else if (m_Velocity.y>0.0f){
+                auto eventBlock=std::dynamic_pointer_cast<EventBlock>(block);
+                if (eventBlock)
+                {
+                    if (!eventBlock->IsActivated())
+                    {
+                        eventBlock->Activate();
+                    }
+                    else
+                    {
+                        if (block->IsBreakable())
+                        {
+                            block->SetDestoryed(true);
+                        }
+                    }
+                }
+                if (block->IsBreakable())
+                {
+                    block->SetDestoryed(true);
+                }
+
                 currentPos.y = block->GetPosition().y - (block->GetScaledSize().y/2.0f) - (this->GetScaledSize().y/2.0f);
             }
             m_Velocity.y=0.0f;
@@ -73,10 +126,17 @@ void Player::Update(const std::vector<std::shared_ptr<Block>>& blocks)
             break;
         }
     }
+
+    if (Util::Input::IsKeyPressed(Util::Keycode::U))
+    {
+        m_InvincibleTimer=999999.0f;
+    }
     if (Util::Input::IsKeyPressed(Util::Keycode::SPACE)&& m_IsGrounded)
     {
         m_Velocity.y=12.0f;
         m_IsGrounded=false;
+        // SetImage("player_jump");
+
     }
 
 }

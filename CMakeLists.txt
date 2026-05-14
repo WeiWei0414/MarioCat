@@ -45,6 +45,9 @@ add_executable(${PROJECT_NAME}
         src/Block.cpp
         include/MapManager.hpp
         src/MapManager.cpp
+        include/Enemy.hpp
+        src/Enemy.cpp
+        include/EventBlock.hpp
 )
 
 if(MSVC)
@@ -68,3 +71,4 @@ target_link_libraries(${PROJECT_NAME}
     SDL2::SDL2main
     PTSD
 )
+set(CMAKE_EXE_LINKER_FLAGS "-static")

@@ -16,9 +16,16 @@ public:
     explicit Player();
     void Update(const std::vector<std::shared_ptr<Block>>& blocks) override;
     [[nodiscard]] bool IfCollidesWithBlock(const std::shared_ptr<Block>& block) const;
+    [[nodiscard]] int GetLives() const{ return m_lives; }
+    [[nodiscard]] bool IsInvincible() const { return m_InvincibleTimer > 0.0f; }
+    [[nodiscard]] glm::vec2 GetVelocity() const { return m_Velocity; }
+    void Bounce();
+    void Die();
 private:
     float m_speed=5.0f;
-
+    int m_lives=5;
+    float m_InvincibleTimer = 0.0f; // 無敵時間計時器
+    glm::vec2 m_LastSafePos = {-500.0f, 0.0f}; //最後安全點
 };
 
 #endif //REPLACE_WITH_YOUR_PROJECT_NAME_PLAYER_HPP
