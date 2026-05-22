@@ -27,7 +27,7 @@ public:
         if (!m_IsActivated) {
             m_IsActivated = true;
 
-            SetDrawable(ImageManager::Get("block_empty"));
+            SetDrawable(ImageManager::Get("brick_3"));
         }
     }
 

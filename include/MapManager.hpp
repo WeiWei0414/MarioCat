@@ -9,10 +9,12 @@
 #include <string>
 #include <memory>
 #include "Enemy.hpp"
+#include "Decoration.hpp"
 struct LevelDate
 {
     std::vector<std::shared_ptr<Block>> blocks;
     std::vector<std::shared_ptr<Enemy>> enemies;
+    std::vector<std::shared_ptr<Decoration>> decorations;
 };
 class MapManager
 {

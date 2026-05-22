@@ -2,7 +2,7 @@
 // Created by eatba on 2026/3/18.
 //
 #include "Player.hpp"
-
+#include "HiddenBlock.hpp"
 #include "EventBlock.hpp"
 #include "Util/Input.hpp"
 #include "Util/Keycode.hpp"
@@ -23,9 +23,28 @@ bool Player::IfCollidesWithBlock(const std::shared_ptr<Block>& block) const
     glm::vec2 b_pos=block->GetPosition();
     glm::vec2 m_size=this->GetScaledSize();
     glm::vec2 b_size=block->GetScaledSize();
+
     bool collisionX=std::abs(m_pos.x-b_pos.x)<(m_size.x+b_size.x)/2.0f-0.1f;
     bool collisionY=std::abs(m_pos.y-b_pos.y)<(m_size.y+b_size.y)/2.0f-0.1f;
-    return collisionX && collisionY;
+    bool isOverlapping = collisionX && collisionY;
+
+    if (!isOverlapping) return false; // 如果連 AABB 都沒碰到，直接回傳 false
+
+    // ==========================================
+    // 🌟 隱藏方塊的特殊穿透邏輯
+    // ==========================================
+    auto hiddenBlock = std::dynamic_pointer_cast<HiddenBlock>(block);
+    if (hiddenBlock && hiddenBlock->IsHidden()) {
+        // 只有當貓咪「正在往上跳」且「人在方塊下方」時，才算撞到！
+        if (m_Velocity.y > 0.0f && m_pos.y < b_pos.y) {
+            hiddenBlock->Reveal(); // 方塊現形！
+            return true;           // 發生碰撞，會觸發你原本的物理推回邏輯
+        }
+        return false; // 其他情況(左右走、掉落)一律當作沒撞到，直接穿過去！
+    }
+
+    // 如果是普通方塊，重疊了就是撞到
+    return true;
 }
 void Player::Die()
 {

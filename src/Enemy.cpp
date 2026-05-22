@@ -18,8 +18,12 @@ bool Enemy::IfCollidesWithBlock(const std::shared_ptr<Block>& block) const {
 }
 
 void Enemy::Update(const std::vector<std::shared_ptr<Block>>& blocks) {
+
     glm::vec2 currentPos = GetPosition();
-    
+    if (!IsGroundAhead(blocks))
+    {
+        m_Direction *= -1.0f;
+    }
     // === 1. X 軸移動與碰撞 (左右巡邏) ===
     currentPos.x += m_Speed * m_Direction;
     SetPosition(currentPos);

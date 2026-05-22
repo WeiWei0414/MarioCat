@@ -4,6 +4,8 @@
 #include "pch.hpp" // IWYU pragma: export
 #include "Block.hpp"
 #include "Enemy.hpp"
+#include "Decoration.hpp"
+#include "Coin.hpp"
 class App {
 public:
     enum class State {
@@ -27,6 +29,8 @@ private:
     std::vector<std::shared_ptr<Block>> m_Blocks;
     std::shared_ptr<Util::GameObject> m_Background;
     std::vector<std::shared_ptr<Enemy>> m_Enemies;
+    std::vector<std::shared_ptr<Decoration>> m_Decorations;
+    std::vector<std::shared_ptr<Coin>> m_Coins;
 
     template<typename T>
     void RenderWithCamera(const std::vector<std::shared_ptr<T>>& objects, float cameraX, float zoom) {

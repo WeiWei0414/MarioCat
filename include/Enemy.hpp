@@ -21,5 +21,4 @@ private:
     bool m_IsDead=false;
 
 };
-
 #endif //REPLACE_WITH_YOUR_PROJECT_NAME_ENEMY_HPP
