@@ -50,8 +50,9 @@ add_executable(${PROJECT_NAME}
         include/EventBlock.hpp
         include/Decoration.hpp
         src/HiddenBlock.hpp
-        include/MovingBlock.hpp
         include/Coin.hpp
+        include/NormalEnemy.hpp
+        src/NormalEnemy.cpp
 )
 
 if(MSVC)

@@ -6,7 +6,7 @@
 #include "EventBlock.hpp"
 #include "Enemy.hpp"
 #include "HiddenBlock.hpp"
-
+#include "NormalEnemy.hpp"
 LevelDate MapManager::LoadMap(const std::string& filePath)
 {
     LevelDate level;
@@ -84,9 +84,24 @@ LevelDate MapManager::LoadMap(const std::string& filePath)
                         level.blocks.push_back(deco);
                         break;
                     }
+                case 42:
+                    {
+                        auto deco=std::make_shared<Block>("pipe");
+                        deco->SetPosition(pos);
+                        level.blocks.push_back(deco);
+
+                        auto sign = std::make_shared<Decoration>("sign", -4);
+                        glm::vec2 signPos = pos;
+                        signPos.y += 70.0f;
+                        signPos.x-=10.0f;
+                        sign->SetPosition(signPos);
+
+                        level.decorations.push_back(sign);
+                        break;
+                    }
                 case 50:
                     {
-                        auto enemy=std::make_shared<Enemy>("teki_1");
+                        auto enemy=std::make_shared<NormalEnemy>("teki_1",false);
                         enemy->SetPosition(pos);
                         level.enemies.push_back(enemy);
                         break;

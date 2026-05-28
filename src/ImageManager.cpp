@@ -23,6 +23,7 @@ void ImageManager::LoadAll()
     s_Images["cloud"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/cloud.png");
     s_Images["pipe"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/pipe.png");
     s_Images["coin"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/coin.png");
+    s_Images["sign"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/sign.png");
 
     //敵人
     s_Images["teki_1"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/teki_1.png");

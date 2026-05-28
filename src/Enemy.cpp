@@ -19,40 +19,7 @@ bool Enemy::IfCollidesWithBlock(const std::shared_ptr<Block>& block) const {
 
 void Enemy::Update(const std::vector<std::shared_ptr<Block>>& blocks) {
 
-    glm::vec2 currentPos = GetPosition();
-    if (!IsGroundAhead(blocks))
-    {
-        m_Direction *= -1.0f;
-    }
-    // === 1. X 軸移動與碰撞 (左右巡邏) ===
-    currentPos.x += m_Speed * m_Direction;
-    SetPosition(currentPos);
 
-    for (const auto& block : blocks) {
-        if (IfCollidesWithBlock(block)) {
-            // 如果撞到牆壁了，就退回原位，並且「反轉方向」！
-            currentPos.x -= m_Speed * m_Direction;
-            m_Direction *= -1.0f; // 往左撞到就變往右，往右撞到就變往左
-            SetPosition(currentPos);
-            break;
-        }
-    }
-
-    // === 2. Y 軸重力與碰撞 (讓怪物能踩在地板上) ===
-    m_Velocity.y -= 0.5f;
-    currentPos.y += m_Velocity.y;
-    SetPosition(currentPos);
-
-    for (const auto& block : blocks) {
-        if (IfCollidesWithBlock(block)) {
-            if (m_Velocity.y < 0.0f) { // 踩到地板
-                currentPos.y = block->GetPosition().y + (block->GetScaledSize().y / 2.0f) + (this->GetScaledSize().y / 2.0f);
-            }
-            m_Velocity.y = 0.0f;
-            SetPosition(currentPos);
-            break;
-        }
-    }
 }
 
 void Enemy::Die()

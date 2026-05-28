@@ -9,8 +9,9 @@
 #include "MapManager.hpp"
 #include <algorithm>
 #include "Block.hpp"
-#include "EventBlock.hpp"
 
+#include "EventBlock.hpp"
+#include "NormalEnemy.hpp"
 void App::Start() {
     LOG_TRACE("Start");
 
@@ -32,6 +33,43 @@ void App::Start() {
 void App::Update() {
     // 1. 畫背景 (背景不受縮放與攝影機影響，直接填滿最底層)
     m_Background->Draw();
+    if (!m_IsEnteringPipe && Util::Input::IsKeyDown(Util::Keycode::S))
+    {
+        for (auto& block : m_Blocks)
+        {
+            auto eventBlock = std::dynamic_pointer_cast<EventBlock>(block);
+            if (eventBlock && eventBlock->GetEventID()==42)
+            {
+                glm::vec2 pPos = m_Player->GetPosition();
+                glm::vec2 bPos = eventBlock->GetPosition();
+                bool is_above = pPos.y > bPos.y;
+                bool is_alignedX = std::abs(pPos.x - bPos.x)<20.0f; //是否對其
+                float distY = std::abs((pPos.y - m_Player->GetScaledSize().y / 2.0f) - (bPos.y + eventBlock->GetScaledSize().y / 2.0f));
+                if (is_above && is_alignedX && distY < 10.0f)
+                {
+                    m_IsEnteringPipe = true;
+                    m_PipeAnimationTimer=120;
+                    m_Player->SetZIndex(-6);
+                    m_Player->SetPosition({bPos.x, pPos.y});
+                    break;
+                }
+            }
+        }
+    }
+    if (m_IsEnteringPipe)
+    {
+        m_PipeAnimationTimer--;
+        glm::vec2 pPos = m_Player->GetPosition();
+        pPos.y-=1.5f;
+        m_Player->SetPosition(pPos);
+        if (m_PipeAnimationTimer <= 0)
+        {
+            m_IsEnteringPipe=false;
+            m_Player->SetZIndex(0);
+        }
+        //水管飛天
+        
+    }
     for (auto& block : m_Blocks)
     {
         auto eventBlock = std::dynamic_pointer_cast<EventBlock>(block);
@@ -179,12 +217,15 @@ void App::Update() {
             }
             case 93:
                 {
-                    auto enemy=std::make_shared<Enemy>("teki_1");
+                    auto enemy=std::make_shared<NormalEnemy>("teki_1");
                     glm::vec2 spawnPos = eventBlock->GetPosition();
                     float blockHalfHeight = eventBlock->GetScaledSize().y / 2.0f;
                     float enemyHalfHeight = enemy->GetScaledSize().y / 2.0f;
                     spawnPos.y += blockHalfHeight + enemyHalfHeight + 5.0f;
                     enemy->SetPosition(spawnPos);
+                    enemy->SetDirection(1.0f);
+
+
                     m_Enemies.push_back(enemy);
                 }
 

@@ -10,11 +10,9 @@
 #include <string>
 class Decoration : public Util::GameObject {
 public:
-    explicit Decoration(const std::string& imageName) {
+    explicit Decoration(const std::string& imageName,int zIndex = -5) {
         SetDrawable(ImageManager::Get(imageName));
-
-
-        SetZIndex(-5);
+        SetZIndex(zIndex);
     }
 
     [[nodiscard]] glm::vec2 GetPosition() const { return m_Transform.translation; }
