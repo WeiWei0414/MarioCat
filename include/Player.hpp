@@ -19,13 +19,17 @@ public:
     [[nodiscard]] int GetLives() const{ return m_lives; }
     [[nodiscard]] bool IsInvincible() const { return m_InvincibleTimer > 0.0f; }
     [[nodiscard]] glm::vec2 GetVelocity() const { return m_Velocity; }
+    void SetVelocity(const glm::vec2& velocity) { m_Velocity = velocity; }
     void Bounce();
     void Die();
+    void PowerUp();
+    [[nodiscard]] bool IsSuper() const { return m_IsSuper; }
 private:
     float m_speed=5.0f;
     int m_lives=5;
     float m_InvincibleTimer = 0.0f; // 無敵時間計時器
     glm::vec2 m_LastSafePos = {-500.0f, 0.0f}; //最後安全點
+    bool m_IsSuper=false;
 };
 
 #endif //REPLACE_WITH_YOUR_PROJECT_NAME_PLAYER_HPP

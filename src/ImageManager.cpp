@@ -24,9 +24,13 @@ void ImageManager::LoadAll()
     s_Images["pipe"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/pipe.png");
     s_Images["coin"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/coin.png");
     s_Images["sign"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/sign.png");
-
+    s_Images["mushroom_1"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/mushroom_1.png");
+    s_Images["mushroom_2"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/mushroom_2.png");
+    s_Images["mushroom_3"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/mushroom_3.png");
+    s_Images["player_powerup"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/player_powerup.png");
     //敵人
     s_Images["teki_1"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/teki_1.png");
+    s_Images["fly_teki"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/fly_teki.png");
 }
 
 std::shared_ptr<Util::Image> ImageManager::Get(const std::string& name)

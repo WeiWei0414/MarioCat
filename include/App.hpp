@@ -6,7 +6,7 @@
 #include "Enemy.hpp"
 #include "Decoration.hpp"
 #include "Coin.hpp"
-#include "Util/Text.hpp"
+#include "Mushroom.hpp"
 class App {
 public:
     enum class State {
@@ -32,8 +32,10 @@ private:
     std::vector<std::shared_ptr<Enemy>> m_Enemies;
     std::vector<std::shared_ptr<Decoration>> m_Decorations;
     std::vector<std::shared_ptr<Coin>> m_Coins;
-    bool m_IsEnteringPipe = false;
+    std::vector<std::shared_ptr<Mushroom>> m_Mushrooms;
+    int m_PipeAnimPhase = 0;
     int m_PipeAnimationTimer = 0;
+    float m_OriginalPipeX = 0.0f;
     template<typename T>
     void RenderWithCamera(const std::vector<std::shared_ptr<T>>& objects, float cameraX, float zoom) {
         for (auto& obj : objects) {

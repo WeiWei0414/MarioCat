@@ -20,7 +20,7 @@ LevelDate MapManager::LoadMap(const std::string& filePath)
     int row=0;
     const float BLOCK_SIZE=29.0f;
     float startX=-625.0f;
-    float startY=195.0f;
+    float startY=180.0f;
 
     while (std::getline(file,line))
     {
@@ -79,18 +79,18 @@ LevelDate MapManager::LoadMap(const std::string& filePath)
                 }
                 case 41:
                     {
-                        auto deco=std::make_shared<Block>("pipe");
+                        auto deco=std::make_shared<EventBlock>("pipe",tileID);
                         deco->SetPosition(pos);
                         level.blocks.push_back(deco);
                         break;
                     }
                 case 42:
                     {
-                        auto deco=std::make_shared<Block>("pipe");
+                        auto deco=std::make_shared<EventBlock>("pipe",tileID);
                         deco->SetPosition(pos);
                         level.blocks.push_back(deco);
 
-                        auto sign = std::make_shared<Decoration>("sign", -4);
+                        auto sign = std::make_shared<Decoration>("sign", -8);
                         glm::vec2 signPos = pos;
                         signPos.y += 70.0f;
                         signPos.x-=10.0f;
@@ -146,6 +146,12 @@ LevelDate MapManager::LoadMap(const std::string& filePath)
                         break;
                 }
                 case 93:{
+                        auto block = std::make_shared<EventBlock>("brick_2",tileID);
+                        block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        level.blocks.push_back(block);
+                        break;
+                }
+                case 94:{
                         auto block = std::make_shared<EventBlock>("brick_2",tileID);
                         block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
                         level.blocks.push_back(block);

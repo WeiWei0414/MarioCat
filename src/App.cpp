@@ -33,42 +33,138 @@ void App::Start() {
 void App::Update() {
     // 1. 畫背景 (背景不受縮放與攝影機影響，直接填滿最底層)
     m_Background->Draw();
-    if (!m_IsEnteringPipe && Util::Input::IsKeyDown(Util::Keycode::S))
+    // 3. 攝影機與縮放設定
+    float startCameraX = -213.0f;
+    static float maxCameraX = startCameraX;
+
+    float targetCameraX = std::max(startCameraX, m_Player->GetPosition().x);
+    float zoom = 1.5f; // 🌟 你的放大倍率，大於 1 就是放大
+
+    if (targetCameraX > maxCameraX) {
+        maxCameraX = targetCameraX;
+    }
+    float cameraX = maxCameraX;
+
+    // 左側隱形牆限制 (如果你覺得放大後能往回走的空間變大了，可以把這裡的 -600.0f 調小一點)
+    float leftEdge = cameraX - 385.0f;
+    if (m_Player->GetPosition().x < leftEdge)
     {
-        for (auto& block : m_Blocks)
-        {
+        m_Player->SetPosition({leftEdge, m_Player->GetPosition().y});
+    }
+    if (m_PipeAnimPhase == 0 && Util::Input::IsKeyDown(Util::Keycode::S)) {
+        for (auto& block : m_Blocks) {
             auto eventBlock = std::dynamic_pointer_cast<EventBlock>(block);
-            if (eventBlock && eventBlock->GetEventID()==42)
-            {
+            if (eventBlock && eventBlock->GetEventID() == 42) {
+
                 glm::vec2 pPos = m_Player->GetPosition();
                 glm::vec2 bPos = eventBlock->GetPosition();
+
                 bool is_above = pPos.y > bPos.y;
-                bool is_alignedX = std::abs(pPos.x - bPos.x)<20.0f; //是否對其
+                bool is_alignedX = std::abs(pPos.x - bPos.x) < 20.0f;
                 float distY = std::abs((pPos.y - m_Player->GetScaledSize().y / 2.0f) - (bPos.y + eventBlock->GetScaledSize().y / 2.0f));
-                if (is_above && is_alignedX && distY < 10.0f)
-                {
-                    m_IsEnteringPipe = true;
-                    m_PipeAnimationTimer=120;
-                    m_Player->SetZIndex(-6);
+
+                if (is_above && is_alignedX && distY < 10.0f) {
+                    LOG_INFO("階段1：貓咪開始下沉！");
+
+                    // 🌟 設定進入第一階段
+                    m_PipeAnimPhase = 1;
+                    m_PipeAnimationTimer = 60; // 第一階段播 60 幀
+
+                    // 🌟 記住這根水管！我們等等要拿它來抖動！
+
+                    m_OriginalPipeX = bPos.x;
+
+                    m_Player->SetZIndex(-1);
                     m_Player->SetPosition({bPos.x, pPos.y});
+                    m_Decorations.erase(
+                        std::remove_if(m_Decorations.begin(), m_Decorations.end(),
+                            [&bPos](const std::shared_ptr<Decoration>& deco) {
+                                glm::vec2 dPos = deco->GetPosition();
+                                // 檢查裝飾品的座標是不是跟水管非常接近 (容許 20 像素的微調誤差)
+                                bool isCloseX = std::abs(dPos.x - bPos.x) < 50.0f;
+                                bool isCloseY = std::abs(dPos.y - bPos.y) < 100.0f;
+
+                                // 如果很近，就代表它是這個水管的告示牌，回傳 true 讓 erase 刪除它！
+                                return isCloseX && isCloseY;
+                            }),
+                        m_Decorations.end()
+                    );
                     break;
                 }
             }
         }
     }
-    if (m_IsEnteringPipe)
-    {
+    if (m_PipeAnimPhase > 0) {
+
         m_PipeAnimationTimer--;
-        glm::vec2 pPos = m_Player->GetPosition();
-        pPos.y-=1.5f;
-        m_Player->SetPosition(pPos);
-        if (m_PipeAnimationTimer <= 0)
-        {
-            m_IsEnteringPipe=false;
-            m_Player->SetZIndex(0);
+
+        // 🎬 劇本 1：貓咪下沉
+        if (m_PipeAnimPhase == 1) {
+            glm::vec2 pos = m_Player->GetPosition();
+            pos.y -= 1.4f;
+            m_Player->SetPosition(pos);
+
+            if (m_PipeAnimationTimer <= 0) {
+                m_PipeAnimPhase = 2;
+                m_PipeAnimationTimer = 40;
+            }
+        }
+        // 🎬 劇本 2 & 3：水管發抖與升天
+        else if (m_PipeAnimPhase == 2 || m_PipeAnimPhase == 3) {
+
+            // 🌟 既然不存指標，我們就當場把它找出來！
+            for (auto& block : m_Blocks) {
+                auto eventBlock = std::dynamic_pointer_cast<EventBlock>(block);
+                if (eventBlock && eventBlock->GetEventID() == 42) {
+
+                    glm::vec2 pipePos = eventBlock->GetPosition();
+                    glm::vec2 catPos = m_Player->GetPosition();
+
+                    // --- 劇本 2：水管發抖 ---
+                    if (m_PipeAnimPhase == 2) {
+                        float offset = (m_PipeAnimationTimer % 4 < 2) ? 4.0f : -4.0f;
+                        pipePos.x = m_OriginalPipeX + offset;
+
+                        catPos.x = pipePos.x; // 貓咪跟著抖
+
+                        if (m_PipeAnimationTimer <= 0) {
+                            pipePos.x = m_OriginalPipeX; // 抖完擺正
+                            m_PipeAnimPhase = 3;
+                            m_PipeAnimationTimer = 180;
+                        }
+                    }
+                    // --- 劇本 3：帶貓升天 ---
+                    else if (m_PipeAnimPhase == 3) {
+                        pipePos.y += 10.0f;
+                        catPos.y += 10.0f;
+
+                        if (m_PipeAnimationTimer <= 0 || pipePos.y > 1500.0f) {
+                            m_PipeAnimPhase = 0;
+                            m_Player->SetZIndex(5);
+                            m_Player->Die(); // 演出結束，整死玩家
+                        }
+                    }
+
+                    // 套用新座標
+                    eventBlock->SetPosition(pipePos);
+                    m_Player->SetPosition(catPos);
+                    break; // 找到了就跳出迴圈，不用繼續找了
+                }
+            }
         }
         //水管飛天
-        
+        RenderWithCamera(m_Blocks, cameraX, zoom);
+        RenderWithCamera(m_Enemies, cameraX, zoom);
+        RenderWithCamera(m_Decorations, cameraX, zoom);
+
+        // (套用縮放的畫貓咪邏輯)
+        glm::vec2 realPlayerPos = m_Player->GetPosition();
+        m_Player->SetPosition({(realPlayerPos.x - cameraX) * zoom, realPlayerPos.y * zoom});
+        m_Player->SetScale({zoom, zoom});
+        m_Player->Draw();
+        m_Player->SetPosition(realPlayerPos);
+        m_Player->SetScale({1.0f, 1.0f});
+        return;
     }
     for (auto& block : m_Blocks)
     {
@@ -98,6 +194,34 @@ void App::Update() {
                 eventBlock->SetPosition(bPos);
             }
         }
+        if (eventBlock && eventBlock->GetEventID()==41 && !eventBlock->HasSpawned())
+        {
+            glm::vec2 pPos = m_Player->GetPosition();
+            glm::vec2 bPos = eventBlock->GetPosition();
+
+
+            bool is_above = pPos.y > bPos.y;
+
+            bool is_alignedX = std::abs(bPos.x - pPos.x) < 40.0f;
+
+            bool is_closeY = (pPos.y - bPos.y) < 750.0f;
+            if (is_above && is_alignedX && is_closeY)
+            {
+                auto flyingEnemy = std::make_shared<Enemy>("fly_teki");
+                float spawnY = bPos.y + (eventBlock->GetScaledSize().y / 2.0f) + (flyingEnemy->GetScaledSize().y / 2.0f) + 1.0f;
+                flyingEnemy->SetPosition({bPos.x, spawnY});
+
+                // 3. 發射魔法：給予極大的向上初速度！(把它當子彈發射出去)
+                flyingEnemy->SetVelocity({0.0f, 15.0f});
+
+                // 4. 丟進大管家的陣列裡，下一幀開始它就會自動受重力影響並掉下來
+                m_Enemies.push_back(flyingEnemy);
+
+                // 5. 標記為已觸發，確保這個水管只會發射一次
+                eventBlock->SetSpawned(true);
+            }
+        }
+
     }
     // 2. 物理運算 (維持在真實比例下運作，確保碰撞正確)
     m_Player->Update(m_Blocks);
@@ -105,31 +229,25 @@ void App::Update() {
     for (auto& enemy : m_Enemies)
     {
         enemy->Update(m_Blocks);
+        if (std::dynamic_pointer_cast<NormalEnemy>(enemy)==nullptr)
+        {
+            glm::vec2 Pos = enemy->GetPosition();
+            Pos.y+=12.0f;
+            enemy->SetPosition(Pos);
+            if (Pos.y>1000.0f)
+            {
+                enemy->Die();
+            }
+        }
     }
-    // 3. 攝影機與縮放設定
-    float startCameraX = -213.0f;
-    static float maxCameraX = startCameraX;
 
-    float targetCameraX = std::max(startCameraX, m_Player->GetPosition().x);
-    float zoom = 1.5f; // 🌟 你的放大倍率，大於 1 就是放大
-
-    if (targetCameraX > maxCameraX) {
-        maxCameraX = targetCameraX;
-    }
-    float cameraX = maxCameraX;
-
-    // 左側隱形牆限制 (如果你覺得放大後能往回走的空間變大了，可以把這裡的 -600.0f 調小一點)
-    float leftEdge = cameraX - 385.0f;
-    if (m_Player->GetPosition().x < leftEdge)
-    {
-        m_Player->SetPosition({leftEdge, m_Player->GetPosition().y});
-    }
 
     // ==========================================
     // 4. 繪圖階段：套用縮放與偏移的障眼法
     // ==========================================
 
     // -- 處理所有磚塊 --
+    RenderWithCamera(m_Mushrooms, cameraX, zoom);
     RenderWithCamera(m_Blocks, cameraX, zoom);
     RenderWithCamera(m_Enemies, cameraX, zoom);
     RenderWithCamera(m_Decorations, cameraX, zoom);
@@ -181,6 +299,23 @@ void App::Update() {
             }
         }
     }
+    for (auto& mushroom : m_Mushrooms)
+    {
+        mushroom->Update(m_Blocks);
+        if (!mushroom->IsEaten() && m_Player->IfCollides(mushroom))
+        {
+            mushroom->Eat();
+            int ID=mushroom->GetTypeID();
+            switch (ID)
+            {
+            case 1:
+                {
+                    m_Player->PowerUp();
+                    break;
+                }
+            }
+        }
+    }
     m_Enemies.erase(
         std::remove_if(m_Enemies.begin(), m_Enemies.end(), [](const std::shared_ptr<Enemy>& enemy) {
             return enemy->IsDead();
@@ -193,6 +328,12 @@ void App::Update() {
             }),
             m_Coins.end()
         );
+    m_Mushrooms.erase(
+        std::remove_if(m_Mushrooms.begin(), m_Mushrooms.end(), [](const std::shared_ptr<Mushroom>& m) {
+            return m->IsEaten();
+        }),
+        m_Mushrooms.end()
+    );
 
     // 2. 畫出金幣 (記得加到 RenderWithCamera 裡面，讓它會跟著畫面縮放！)
     // 把這行加在 RenderWithCamera(m_Blocks, ...) 的附近
@@ -227,6 +368,17 @@ void App::Update() {
 
 
                     m_Enemies.push_back(enemy);
+                    break;
+                }
+            case 94:
+                {
+                    auto mushroom = std::make_shared<Mushroom>("mushroom_1",1);
+                    glm::vec2 spawnPos=eventBlock->GetPosition();
+                    spawnPos.y += (eventBlock->GetScaledSize().y / 2.0f) + (mushroom->GetScaledSize().y / 2.0f) + 1.0f;
+                    mushroom->SetPosition(spawnPos);
+                    mushroom->SetVelocity({0.0f,5.0f});
+                    m_Mushrooms.push_back(mushroom);
+                    eventBlock->SetSpawned(true);
                 }
 
                 // (未來如果還有噴蘑菇、現形等事件都寫在這裡)

@@ -53,6 +53,8 @@ add_executable(${PROJECT_NAME}
         include/Coin.hpp
         include/NormalEnemy.hpp
         src/NormalEnemy.cpp
+        include/Mushroom.hpp
+        src/Mushroom.cpp
 )
 
 if(MSVC)

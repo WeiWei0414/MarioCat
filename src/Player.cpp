@@ -49,6 +49,11 @@ bool Player::IfCollidesWithBlock(const std::shared_ptr<Block>& block) const
 void Player::Die()
 {
     if (IsInvincible()) return;
+    if (m_IsSuper)
+    {
+        m_IsSuper = false;
+        SetImage("player_idle");
+    }
     m_lives--;
     if (m_lives>0)
     {
@@ -65,6 +70,14 @@ void Player::Bounce()
 {
     m_Velocity.y=8.0f;
 }
+
+void Player::PowerUp()
+{
+
+    m_IsSuper=true;
+    SetImage("player_powerup");
+}
+
 void Player::Update(const std::vector<std::shared_ptr<Block>>& blocks)
 {
     if (m_InvincibleTimer>0.0f)
