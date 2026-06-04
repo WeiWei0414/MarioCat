@@ -21,16 +21,24 @@ void ImageManager::LoadAll()
     s_Images["mountain"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/mountain.png");
     s_Images["grass"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/grass.png");
     s_Images["cloud"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/cloud.png");
+    s_Images["fake_cloud"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/fake_cloud.png");
     s_Images["pipe"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/pipe.png");
     s_Images["coin"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/coin.png");
     s_Images["sign"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/sign.png");
+    s_Images["sign2"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/flag2.png");
     s_Images["mushroom_1"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/mushroom_1.png");
     s_Images["mushroom_2"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/mushroom_2.png");
     s_Images["mushroom_3"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/mushroom_3.png");
     s_Images["player_powerup"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/player_powerup.png");
+    s_Images["straght"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/straght.png");
     //敵人
     s_Images["teki_1"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/teki_1.png");
     s_Images["fly_teki"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/fly_teki.png");
+    s_Images["fly_teki_2"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/fly_teki_2.png");
+    s_Images["star1"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/star1.png");
+    s_Images["turtle_walk"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/turtle_walk.png");
+    s_Images["turtle_shell"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/turtle_shell.png");
+    s_Images["bullet_1"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/bullet_1.png");
 }
 
 std::shared_ptr<Util::Image> ImageManager::Get(const std::string& name)

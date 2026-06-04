@@ -9,8 +9,10 @@
 #include "MapManager.hpp"
 #include <algorithm>
 #include "Block.hpp"
-
+#include "StarEnemy.hpp"
+#include "TurtleEnemy.hpp"
 #include "EventBlock.hpp"
+#include "FlyingEnemy.hpp"
 #include "NormalEnemy.hpp"
 void App::Start() {
     LOG_TRACE("Start");
@@ -166,9 +168,187 @@ void App::Update() {
         m_Player->SetScale({1.0f, 1.0f});
         return;
     }
+    // ==========================================
+    // 🎬 劇本：旗桿過關動畫演出
+    // ==========================================
+    if (m_FlagAnimPhase > 0) {
+        glm::vec2 pos = m_Player->GetPosition();
+
+        if (m_FlagAnimPhase == 1) {
+            // --- 階段 1：滑下旗桿 ---
+            pos.y -= 4.0f;
+            if (pos.y <= m_FlagBottomY) {
+                pos.y = m_FlagBottomY; // 到底了，踩穩
+                m_FlagAnimPhase = 2;   // 準備走向右邊
+                m_FlagAnimTimer = 0;
+            }
+        }
+        else if (m_FlagAnimPhase == 2) {
+            // --- 階段 2：往右走向城堡 ---
+            pos.x += 3.0f;
+            m_FlagAnimTimer++;
+
+            if (m_IsTrollFlagDeath && m_FlagAnimTimer > 40) {
+                // 🌟 摸到上半部的懲罰：動畫播到一半，當場死亡！
+                LOG_INFO("貪心的下場：旗桿死！");
+                m_FlagAnimPhase = 0; // 結束動畫狀態
+                m_Player->Die();
+            }
+            else if (!m_IsTrollFlagDeath && m_FlagAnimTimer > 100) {
+                // 🌟 摸到下半部的獎勵：順利走到畫面外，成功過關！
+                LOG_INFO("安全通關！");
+                m_FlagAnimPhase = 0;
+                m_CurrentState = State::END; // 結束遊戲或切換到過關畫面
+            }
+        }
+
+        m_Player->SetPosition(pos);
+
+        // --- 繪圖 (維持動畫期間的畫面，不執行普通物理與操控) ---
+        RenderWithCamera(m_Blocks, cameraX, zoom);
+        RenderWithCamera(m_Enemies, cameraX, zoom);
+        RenderWithCamera(m_Decorations, cameraX, zoom);
+
+        glm::vec2 realPlayerPos = m_Player->GetPosition();
+        m_Player->SetPosition({(realPlayerPos.x - cameraX) * zoom, realPlayerPos.y * zoom});
+        m_Player->SetScale({zoom, zoom});
+        m_Player->Draw();
+        m_Player->SetPosition(realPlayerPos);
+        m_Player->SetScale({1.0f, 1.0f});
+
+        return; // 凍結其他所有操作
+    }
     for (auto& block : m_Blocks)
     {
         auto eventBlock = std::dynamic_pointer_cast<EventBlock>(block);
+        if (eventBlock && eventBlock->GetEventID() == 83)
+        {
+            glm::vec2 pPos = m_Player->GetPosition();
+            glm::vec2 bPos = eventBlock->GetPosition();
+            glm::vec2 pSize = m_Player->GetScaledSize();
+            glm::vec2 bSize = eventBlock->GetScaledSize();
+
+            // ⚠️ 就是這裡！我們手動把碰撞範圍「往外加 2.0f」，抵銷被推開的誤差
+            bool touchX = std::abs(pPos.x - bPos.x) <= ((pSize.x + bSize.x) / 2.0f) + 2.0f;
+            bool touchY = std::abs(pPos.y - bPos.y) <= ((pSize.y + bSize.y) / 2.0f) + 2.0f;
+
+            if (touchX && touchY)
+            {
+                if (!eventBlock->HasSpawned()) // 避免使用 Activate() 導致變成空磚塊
+                {
+                    eventBlock->SetSpawned(true);
+                    eventBlock->SetDrawable(ImageManager::Get("fake_cloud"));
+                }
+
+                m_Player->Die();
+            }
+        }
+        if (eventBlock && eventBlock->GetEventID() == 84)
+        {
+            glm::vec2 pPos = m_Player->GetPosition();
+            glm::vec2 bPos = eventBlock->GetPosition();
+
+            // 1. 設定感應雷達範圍：X 軸左右 150 像素內，且貓咪在感應器下方
+            bool inZoneX = std::abs(pPos.x - bPos.x) < 150.0f;
+            bool isUnder = pPos.y < bPos.y;
+
+            // 2. 只要玩家進入區域，且這個陷阱還沒被觸發過 (!HasSpawned)
+            if (inZoneX && isUnder && !eventBlock->HasSpawned())
+            {
+
+
+                // 一口氣產生 4 隻怪物
+                for (int i = 0; i < 4; ++i)
+                {
+                    // 呼叫我們之前寫好的 NormalEnemy (預設 avoidCliff = false，所以牠們會笨笨地掉下懸崖)
+                    auto enemy = std::make_shared<NormalEnemy>("teki_1");
+
+                    // 🌟 精算生成位置：以感應器為中心，向左右平均散開
+                    // (i - 1.5f) 會產出 -1.5, -0.5, 0.5, 1.5，乘上 60.0f 的間距
+                    float offsetX = (i - 1.5f) * 60.0f;
+
+                    // 高度設定在感應器的上方 100 像素，製造從天而降的感覺
+                    glm::vec2 spawnPos = { bPos.x + offsetX, bPos.y + 100.0f };
+
+                    enemy->SetPosition(spawnPos);
+
+                    // 將怪物加入陣列，物理引擎與碰撞系統會自動接手後續的重力掉落與殺人判斷
+                    m_Enemies.push_back(enemy);
+                }
+
+                // 3. 標記為已觸發，確保這個陷阱只會掉一次怪物！
+                eventBlock->SetSpawned(true);
+            }
+        }
+        if (eventBlock && eventBlock->GetEventID() == 85)
+        {
+            glm::vec2 pPos = m_Player->GetPosition();
+            glm::vec2 bPos = eventBlock->GetPosition();
+
+            // 1. 狀態判斷：如果還沒發射，開啟雷達偵測 (改用 HasSpawned)
+            if (!eventBlock->HasSpawned())
+            {
+                // 雷達條件：
+                // 貓咪在棒子的左邊且距離小於 300 像素 (X 軸警戒區)
+                bool inRangeX = (bPos.x - pPos.x) > 0.0f && (bPos.x - pPos.x) < 300.0f;
+                // 貓咪的高度跟棒子差不多 (Y 軸誤差在 60 像素內，代表在同一水平線上)
+                bool inRangeY = std::abs(pPos.y - bPos.y) < 60.0f;
+
+                if (inRangeX && inRangeY)
+                {
+                    // 🌟 關鍵修改：用 SetSpawned 取代 Activate，就不會被強制換圖片了！
+                    eventBlock->SetSpawned(true);
+                }
+            }
+
+            // 2. 狀態判斷：觸發後，無情地往左邊衝刺！(改用 HasSpawned)
+            if (eventBlock->HasSpawned())
+            {
+                eventBlock->SetVisible(true);
+                bPos.x -= 10.0f; // 突刺速度
+                eventBlock->SetPosition(bPos);
+
+                // 3. 殺人判定
+                glm::vec2 pSize = m_Player->GetScaledSize();
+                glm::vec2 bSize = eventBlock->GetScaledSize();
+
+                bool touchX = std::abs(pPos.x - bPos.x) <= ((pSize.x + bSize.x) / 2.0f) + 1.0f;
+                bool touchY = std::abs(pPos.y - bPos.y) <= ((pSize.y + bSize.y) / 2.0f) + 1.0f;
+
+                if (touchX && touchY)
+                {
+                    m_Player->Die();
+                }
+            }
+        }
+        if (eventBlock && eventBlock->GetEventID() == 86 && m_FlagAnimPhase == 0)
+        {
+            glm::vec2 pPos = m_Player->GetPosition();
+            glm::vec2 bPos = eventBlock->GetPosition();
+            glm::vec2 pSize = m_Player->GetScaledSize();
+            glm::vec2 bSize = eventBlock->GetScaledSize();
+
+            // 🌟 關鍵修正1：把 X 軸容錯加到 15.0f，抵銷物理引擎的「力場排斥」距離！
+            bool touchX = std::abs(pPos.x - bPos.x) <= ((pSize.x + bSize.x) / 2.0f) + 15.0f;
+            bool touchY = std::abs(pPos.y - bPos.y) <= ((pSize.y + bSize.y) / 2.0f) + 2.0f;
+
+            // 如果碰到了，且貓咪是從左邊來的
+            if (touchX && touchY && pPos.x < bPos.x)
+            {
+                LOG_INFO("觸發過關旗桿！");
+                m_FlagAnimPhase = 1;
+
+                // 惡意判定：貓咪的 Y 座標如果大於旗桿的 Y 座標 (代表在 1/2 以上的上半部)
+                m_IsTrollFlagDeath = (pPos.y > bPos.y);
+
+                // 計算旗桿底部的 Y 座標，讓貓咪等一下能滑到底部
+                m_FlagBottomY = bPos.y - (bSize.y / 2.0f) + (pSize.y / 2.0f);
+
+                // 🌟 關鍵修正2：精準吸附在旗桿邊緣，避免陷太深被同幀的物理引擎往外彈
+                float snapX = bPos.x - (bSize.x / 2.0f) - (pSize.x / 2.0f) + 8.0f;
+                m_Player->SetPosition({snapX, pPos.y});
+            }
+        }
         if (eventBlock && eventBlock->GetEventID() == 91)
         {
             glm::vec2 pPos = m_Player->GetPosition();
@@ -207,7 +387,7 @@ void App::Update() {
             bool is_closeY = (pPos.y - bPos.y) < 750.0f;
             if (is_above && is_alignedX && is_closeY)
             {
-                auto flyingEnemy = std::make_shared<Enemy>("fly_teki");
+                auto flyingEnemy = std::make_shared<FlyingEnemy>("fly_teki");
                 float spawnY = bPos.y + (eventBlock->GetScaledSize().y / 2.0f) + (flyingEnemy->GetScaledSize().y / 2.0f) + 1.0f;
                 flyingEnemy->SetPosition({bPos.x, spawnY});
 
@@ -221,7 +401,85 @@ void App::Update() {
                 eventBlock->SetSpawned(true);
             }
         }
+        if (eventBlock && eventBlock->GetEventID() == 95)
+        {
+            glm::vec2 pPos = m_Player->GetPosition();
+            glm::vec2 bPos = eventBlock->GetPosition();
 
+            // 條件：貓咪在方塊下方，且 X 軸距離靠近 (80像素內，可自己微調)
+            bool is_under = pPos.y < bPos.y;
+            bool is_alignedX = std::abs(bPos.x - pPos.x) < 80.0f;
+
+            // 只要滿足條件，不需要管狀態，直接往下砸！
+            if (is_under && is_alignedX)
+            {
+                eventBlock->Activate();
+            }
+            if (eventBlock->IsActivated())
+            {
+                bPos.y-=15.0f;
+                eventBlock->SetPosition(bPos);
+                if (m_Player->IfCollidesWithBlock(eventBlock))
+                {
+
+                    m_Player->Die();
+                }
+            }
+        }
+        if (eventBlock && eventBlock->GetEventID() == 52)
+        {
+            glm::vec2 pPos = m_Player->GetPosition();
+            glm::vec2 bPos = eventBlock->GetPosition();
+            eventBlock->SetDrawable(ImageManager::Get("fly_teki_2"));
+            // 條件：貓咪在方塊下方，且 X 軸距離靠近 (80像素內，可自己微調)
+            bool is_under = pPos.y < bPos.y;
+            bool is_alignedX = std::abs(bPos.x - pPos.x) < 80.0f;
+
+            // 只要滿足條件，不需要管狀態，直接往下砸！
+            if (is_under && is_alignedX)
+            {
+                eventBlock->Activate();
+                eventBlock->SetVisible(true);
+            }
+            if (eventBlock->IsActivated())
+            {
+                bPos.y-=15.0f;
+                eventBlock->SetPosition(bPos);
+                if (m_Player->IfCollidesWithBlock(eventBlock))
+                {
+
+                    m_Player->Die();
+                }
+            }
+        }
+
+
+
+    }
+    bool isFallingTriggered = false;
+
+
+    for (auto& block : m_Blocks) {
+        auto eb = std::dynamic_pointer_cast<EventBlock>(block);
+        if (eb && (eb->GetEventID() == 97 || eb->GetEventID() == 98) && eb->IsActivated()) {
+            isFallingTriggered = true;
+            break; // 只要抓到一個被踩，就觸發全體機關！
+        }
+    }
+
+    // 2. 如果機關被觸發，就把所有的 97 跟 98 同步往下移動！
+    if (isFallingTriggered) {
+        for (auto& block : m_Blocks) {
+            auto eb = std::dynamic_pointer_cast<EventBlock>(block);
+            if (eb && (eb->GetEventID() == 97 || eb->GetEventID() == 98)) {
+
+                eb->Activate(); // 強制全體連線進入啟動狀態
+
+                glm::vec2 bPos = eb->GetPosition();
+                bPos.y -= 3.0f; // 🌟 掉落速度 (建議設 3.0f，讓物理引擎的重力能順暢帶著貓咪一起往下)
+                eb->SetPosition(bPos);
+            }
+        }
     }
     // 2. 物理運算 (維持在真實比例下運作，確保碰撞正確)
     m_Player->Update(m_Blocks);
@@ -229,7 +487,7 @@ void App::Update() {
     for (auto& enemy : m_Enemies)
     {
         enemy->Update(m_Blocks);
-        if (std::dynamic_pointer_cast<NormalEnemy>(enemy)==nullptr)
+        if (std::dynamic_pointer_cast<FlyingEnemy>(enemy)!=nullptr)
         {
             glm::vec2 Pos = enemy->GetPosition();
             Pos.y+=12.0f;
@@ -237,6 +495,40 @@ void App::Update() {
             if (Pos.y>1000.0f)
             {
                 enemy->Die();
+            }
+        }
+    }
+    for (auto& enemyA : m_Enemies) {
+
+        // 嘗試看看 enemyA 是不是烏龜？
+        auto turtle = std::dynamic_pointer_cast<TurtleEnemy>(enemyA);
+
+        // 條件：只有「高速移動中的烏龜殼」，且還沒死掉，才有殺傷力
+        if (turtle && turtle->GetState() == TurtleState::SHELL_MOVING && !turtle->IsDead()) {
+
+            for (auto& enemyB : m_Enemies) {
+                // 排除自己，也排除已經死亡的怪物
+                if (enemyA != enemyB && !enemyB->IsDead()) {
+
+                    glm::vec2 posA = enemyA->GetPosition();
+                    glm::vec2 sizeA = enemyA->GetScaledSize();
+                    glm::vec2 posB = enemyB->GetPosition();
+                    glm::vec2 sizeB = enemyB->GetScaledSize();
+
+                    // AABB 碰撞計算 (容錯稍微縮小一點，避免邊緣擦到就死)
+                    bool colX = std::abs(posA.x - posB.x) < ((sizeA.x + sizeB.x) / 2.0f) - 2.0f;
+                    bool colY = std::abs(posA.y - posB.y) < ((sizeA.y + sizeB.y) / 2.0f) - 2.0f;
+
+                    // 如果撞到了！
+                    if (colX && colY) {
+                        LOG_INFO("保齡球 Strike！烏龜殼撞死了怪物！");
+
+                        enemyB->Die(); // 被撞到的怪物當場死亡
+
+                        // 💡 瑪利歐經典設定：烏龜殼會直接貫穿過去連殺，不會停下來
+                        // 如果你想讓烏龜殼撞到怪後停下來，可以在這裡加上 turtle->StopShell();
+                    }
+                }
             }
         }
     }
@@ -283,19 +575,53 @@ void App::Update() {
         m_CurrentState = State::END;
         return; // 直接中斷這幀的 Update，避免畫面上出現奇怪的殘影
     }
-    for (const auto& enemy:m_Enemies)
+    for (const auto& enemy : m_Enemies)
     {
-
         if (m_Player->IfCollides(enemy))
         {
-            if (m_Player->GetVelocity().y<0.0f && m_Player->GetPosition().y>enemy->GetPosition().y)
+            // 判斷貓咪是否從上方掉落踩中敵人
+            bool isFallingOnEnemy = (m_Player->GetVelocity().y < 0.0f && m_Player->GetPosition().y > enemy->GetPosition().y);
+
+            // 嘗試將敵人轉為烏龜，看看它是不是烏龜
+            auto turtle = std::dynamic_pointer_cast<TurtleEnemy>(enemy);
+
+            if (turtle)
             {
-                enemy->Die();
-                m_Player->Bounce();
+                if (turtle->GetState() == TurtleState::WALKING) {
+                    if (isFallingOnEnemy) {
+                        turtle->TurnIntoShell(); // 🌟 踩扁變烏龜殼！
+                        m_Player->Bounce();
+                    } else {
+                        m_Player->Die(); // 側邊碰到走路烏龜會死
+                    }
+                }
+                else if (turtle->GetState() == TurtleState::SHELL_IDLE) {
+                    // 🌟 踢烏龜殼！根據貓咪在左邊還是右邊，決定踢飛方向
+                    float kickDir = (m_Player->GetPosition().x < turtle->GetPosition().x) ? 1.0f : -1.0f;
+                    turtle->KickShell(kickDir);
+
+                    if (isFallingOnEnemy) m_Player->Bounce();
+                }
+                else if (turtle->GetState() == TurtleState::SHELL_MOVING) {
+                    if (isFallingOnEnemy) {
+                        turtle->StopShell(); // 🌟 踩停高速移動的烏龜殼！
+                        m_Player->Bounce();
+                    } else if (turtle->CanKillPlayer()) {
+                        m_Player->Die(); // 被高速烏龜殼撞死 (安全時間過後)
+                    }
+                }
             }
             else
             {
-                m_Player->Die();
+                // ==============================
+                // 這裡是你原本的一般怪物邏輯
+                // ==============================
+                if (isFallingOnEnemy) {
+                    enemy->Die();
+                    m_Player->Bounce();
+                } else {
+                    m_Player->Die();
+                }
             }
         }
     }
@@ -379,6 +705,19 @@ void App::Update() {
                     mushroom->SetVelocity({0.0f,5.0f});
                     m_Mushrooms.push_back(mushroom);
                     eventBlock->SetSpawned(true);
+                    break;
+                }
+            case 96:
+                {
+                    auto star = std::make_shared<StarEnemy>("star1");
+
+                    glm::vec2 spawnPos = eventBlock->GetPosition();
+                    spawnPos.y += (eventBlock->GetScaledSize().y / 2.0f) + (star->GetScaledSize().y / 2.0f) + 1.0f;
+                    star->SetPosition(spawnPos);
+
+                    // 將它加入敵人陣列，共用現成的碰撞與死亡判定！
+                    m_Enemies.push_back(star);
+                    break;
                 }
 
                 // (未來如果還有噴蘑菇、現形等事件都寫在這裡)

@@ -6,7 +6,7 @@ void NormalEnemy::Update(const std::vector<std::shared_ptr<Block>>& blocks) {
     if (m_IsDead) return; // 🌟 如果死了就不動了
 
     glm::vec2 currentPos = GetPosition();
-    if (avoidCliff)
+    if (m_AvoidCliff)
     {
         // 懸崖防呆機制 (呼叫老爸的函式)
         if (!IsGroundAhead(blocks)) {

@@ -55,6 +55,11 @@ add_executable(${PROJECT_NAME}
         src/NormalEnemy.cpp
         include/Mushroom.hpp
         src/Mushroom.cpp
+        include/StarEnemy.hpp
+        src/StarEnemy.cpp
+        include/FlyingEnemy.hpp
+        include/TurtleEnemy.hpp
+        src/TurtleEnemy.cpp
 )
 
 if(MSVC)

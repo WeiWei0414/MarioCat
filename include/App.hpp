@@ -36,6 +36,10 @@ private:
     int m_PipeAnimPhase = 0;
     int m_PipeAnimationTimer = 0;
     float m_OriginalPipeX = 0.0f;
+    int m_FlagAnimPhase = 0;
+    int m_FlagAnimTimer = 0;
+    bool m_IsTrollFlagDeath = false;
+    float m_FlagBottomY = 0.0f;
     template<typename T>
     void RenderWithCamera(const std::vector<std::shared_ptr<T>>& objects, float cameraX, float zoom) {
         for (auto& obj : objects) {

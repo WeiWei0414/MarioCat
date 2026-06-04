@@ -7,6 +7,7 @@
 #include "Enemy.hpp"
 #include "HiddenBlock.hpp"
 #include "NormalEnemy.hpp"
+#include "TurtleEnemy.hpp"
 LevelDate MapManager::LoadMap(const std::string& filePath)
 {
     LevelDate level;
@@ -99,11 +100,35 @@ LevelDate MapManager::LoadMap(const std::string& filePath)
                         level.decorations.push_back(sign);
                         break;
                     }
+                case 43:
+                    {
+                        auto sign = std::make_shared<Decoration>("sign2", -8);
+                        glm::vec2 signPos = pos;
+                        sign->SetPosition(signPos);
+
+                        level.decorations.push_back(sign);
+                        break;
+                    }
                 case 50:
                     {
                         auto enemy=std::make_shared<NormalEnemy>("teki_1",false);
                         enemy->SetPosition(pos);
                         level.enemies.push_back(enemy);
+                        break;
+                    }
+                case 51:
+                    {
+                        auto enemy=std::make_shared<TurtleEnemy>("turtle_walk",true);
+                        enemy->SetPosition(pos);
+                        level.enemies.push_back(enemy);
+                        break;
+                    }
+                case 52:
+                    {
+                        auto deco=std::make_shared<EventBlock>("fly_teki_2",tileID);
+                        deco->SetPosition(pos);
+                        deco->SetVisible(false);
+                        level.blocks.push_back(deco);
                         break;
                     }
                 case 80:
@@ -125,6 +150,30 @@ LevelDate MapManager::LoadMap(const std::string& filePath)
                         auto deco = std::make_shared<Decoration>("cloud");
                         deco->SetPosition(pos);
                         level.decorations.push_back(deco);
+                        break;
+                    }
+                case 83:
+                    {
+                        auto deco = std::make_shared<EventBlock>("cloud",tileID);
+                        deco->SetPosition(pos);
+                        level.blocks.push_back(deco);
+                        break;
+                    }
+                case 84:
+                    {
+                        auto deco = std::make_shared<EventBlock>("cloud",tileID);
+                        deco->SetPosition(pos);
+                        deco->SetVisible(false);
+                        deco->SetZIndex(-11);
+                        level.blocks.push_back(deco);
+                        break;
+                    }
+                case 85:
+                    {
+                        auto deco = std::make_shared<EventBlock>("bullet_1",tileID);
+                        deco->SetPosition(pos);
+                        deco->SetVisible(false);
+                        level.blocks.push_back(deco);
                         break;
                     }
                 case 91:{ //會往上移
@@ -157,6 +206,41 @@ LevelDate MapManager::LoadMap(const std::string& filePath)
                         level.blocks.push_back(block);
                         break;
                 }
+                case 95:
+                    {
+                        auto block = std::make_shared<EventBlock>("brick_1",tileID);
+                        block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        level.blocks.push_back(block);
+                        break;
+                    }
+                case 96:
+                    {
+                        auto block = std::make_shared<EventBlock>("brick_2",tileID);
+                        block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        level.blocks.push_back(block);
+                        break;
+                    }
+                case 97:
+                    {
+                        auto block = std::make_shared<EventBlock>("brick_6",tileID);
+                        block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        level.blocks.push_back(block);
+                        break;
+                    }
+                case 98:
+                    {
+                        auto block = std::make_shared<EventBlock>("brick_5",tileID);
+                        block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        level.blocks.push_back(block);
+                        break;
+                    }
+                case 99:
+                    {
+                        auto block = std::make_shared<EventBlock>("straght",tileID);
+                        block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        level.blocks.push_back(block);
+                        break;
+                    }
                 default:
                     {
                         auto block = std::make_shared<Block>("brick_6");
