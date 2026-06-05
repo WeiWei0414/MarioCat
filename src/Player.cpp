@@ -32,7 +32,7 @@ bool Player::IfCollidesWithBlock(const std::shared_ptr<Block>& block) const
     if (!isOverlapping) return false; // 如果連 AABB 都沒碰到，直接回傳 false
     auto eventBlock = std::dynamic_pointer_cast<EventBlock>(block);
     if (eventBlock) {
-        std::vector<int> ghostIDs = {84,85}; // 如果未來加了新幽靈陷阱，直接改成 {101, 102, 105} 就可以了！
+        std::vector<int> ghostIDs = {84,85,99}; // 如果未來加了新幽靈陷阱，直接改成 {101, 102, 105} 就可以了！
 
         // 2. 去陣列裡面找，看看當前碰到的方塊 ID 有沒有在名單裡
         int currentID = eventBlock->GetEventID();
@@ -40,13 +40,7 @@ bool Player::IfCollidesWithBlock(const std::shared_ptr<Block>& block) const
         if (std::find(ghostIDs.begin(), ghostIDs.end(), currentID) != ghostIDs.end()) {
             return false; // 在名單內！直接當作沒碰到，穿過去！
         }
-        if (currentID == 86) {
-            if (m_pos.x < b_pos.x) {
-                return true;
-            } else {
-                return false;  // 貓在右邊：物理引擎請把它擋下來！
-            }
-        }
+
     }
     // ==========================================
     // 🌟 隱藏方塊的特殊穿透邏輯

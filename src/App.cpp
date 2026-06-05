@@ -171,16 +171,30 @@ void App::Update() {
     // ==========================================
     // 🎬 劇本：旗桿過關動畫演出
     // ==========================================
-    if (m_FlagAnimPhase > 0) {
+if (m_FlagAnimPhase > 0) {
         glm::vec2 pos = m_Player->GetPosition();
 
         if (m_FlagAnimPhase == 1) {
-            // --- 階段 1：滑下旗桿 ---
-            pos.y -= 4.0f;
+            // --- 階段 1：受重力影響掉落 ---
+            static float fallSpeed = 0.0f; // 靜態變數，用來記憶當前的下墜速度
+            fallSpeed += 0.8f;             // 🌟 重力加速度 (數字越大掉越快)
+            pos.y -= fallSpeed;
+
+            // 🌟 半路死判定：只要到達死亡高度，直接中斷所有動畫！
+            if (m_IsTrollFlagDeath && pos.y <= m_FlagBottomY + 80.0f) {
+                LOG_INFO("貪心的下場：滑桿半路死！動畫立刻中止！");
+                m_Player->Die();
+                m_FlagAnimPhase = 0;
+                fallSpeed = 0.0f;    // 🌟 記得歸零，以免下次遊玩時速度爆表
+                return;              // 🌟 立刻退出
+            }
+
+            // 正常滑到底部的判斷
             if (pos.y <= m_FlagBottomY) {
-                pos.y = m_FlagBottomY; // 到底了，踩穩
+                pos.y = m_FlagBottomY; // 完美踩穩地板
                 m_FlagAnimPhase = 2;   // 準備走向右邊
                 m_FlagAnimTimer = 0;
+                fallSpeed = 0.0f;      // 🌟 落地後速度歸零
             }
         }
         else if (m_FlagAnimPhase == 2) {
@@ -188,21 +202,89 @@ void App::Update() {
             pos.x += 3.0f;
             m_FlagAnimTimer++;
 
-            if (m_IsTrollFlagDeath && m_FlagAnimTimer > 40) {
-                // 🌟 摸到上半部的懲罰：動畫播到一半，當場死亡！
-                LOG_INFO("貪心的下場：旗桿死！");
-                m_FlagAnimPhase = 0; // 結束動畫狀態
-                m_Player->Die();
+            // 走大約 90 幀的距離後，停下來
+            if (m_FlagAnimTimer > 90) {
+                m_FlagAnimPhase = 3; // 🌟 進入階段 3 (停留)
+                m_FlagAnimTimer = 0;
             }
-            else if (!m_IsTrollFlagDeath && m_FlagAnimTimer > 100) {
-                // 🌟 摸到下半部的獎勵：順利走到畫面外，成功過關！
+        }
+        else if (m_FlagAnimPhase == 3) {
+            // --- 🌟 階段 3：終點前停留 1 秒鐘 ---
+            m_FlagAnimTimer++;
+
+            // 原地不動，純計時 (60 幀 = 1 秒)
+            if (m_FlagAnimTimer > 60) {
                 LOG_INFO("安全通關！");
                 m_FlagAnimPhase = 0;
-                m_CurrentState = State::END; // 結束遊戲或切換到過關畫面
+                m_CurrentState = State::END; // 真正結束遊戲
             }
         }
 
+        // --- 正常動畫期間的座標更新 ---
         m_Player->SetPosition(pos);
+
+        // ==========================================
+        // 🌟 讓世界繼續運轉，並保留「被怪或陷阱暗算」的判定！
+        // ==========================================
+        for (auto& enemy : m_Enemies)
+        {
+            enemy->Update(m_Blocks);
+
+            if (std::dynamic_pointer_cast<FlyingEnemy>(enemy)!=nullptr)
+            {
+                glm::vec2 Pos = enemy->GetPosition();
+                Pos.y+=12.0f; // 飛行怪物往下掉
+                enemy->SetPosition(Pos);
+                if (Pos.y>1000.0f)
+                {
+                    enemy->Die();
+                }
+            }
+
+            // 動畫期間碰到真怪物，死！
+            if (m_Player->IfCollides(enemy))
+            {
+                LOG_INFO("大意了！過關途中被怪物暗算！");
+                m_Player->Die();
+                m_FlagAnimPhase = 0;
+                return;
+            }
+        }
+
+        // 解除「偽裝成怪物的陷阱方塊」的時間暫停
+        for (auto& block : m_Blocks)
+        {
+            auto eb = std::dynamic_pointer_cast<EventBlock>(block);
+            if (eb && (eb->GetEventID() == 52 || eb->GetEventID() == 95))
+            {
+                glm::vec2 pPos = m_Player->GetPosition();
+                glm::vec2 bPos = eb->GetPosition();
+
+                bool is_under = pPos.y < bPos.y;
+                bool is_alignedX = std::abs(bPos.x - pPos.x) < 80.0f;
+
+                if (is_under && is_alignedX && !eb->HasSpawned())
+                {
+                    eb->SetSpawned(true);
+                    if (eb->GetEventID() == 52) eb->SetVisible(true);
+                }
+
+                if (eb->HasSpawned())
+                {
+                    bPos.y -= 15.0f;
+                    eb->SetPosition(bPos);
+
+                    // 動畫期間被偽裝方塊砸到，死！
+                    if (m_Player->IfCollidesWithBlock(eb))
+                    {
+                        LOG_INFO("慘！過關途中被偽裝方塊砸死！");
+                        m_Player->Die();
+                        m_FlagAnimPhase = 0;
+                        return;
+                    }
+                }
+            }
+        }
 
         // --- 繪圖 (維持動畫期間的畫面，不執行普通物理與操控) ---
         RenderWithCamera(m_Blocks, cameraX, zoom);
@@ -321,32 +403,44 @@ void App::Update() {
                 }
             }
         }
-        if (eventBlock && eventBlock->GetEventID() == 86 && m_FlagAnimPhase == 0)
+        if (eventBlock && eventBlock->GetEventID() == 99 && m_FlagAnimPhase == 0)
         {
             glm::vec2 pPos = m_Player->GetPosition();
             glm::vec2 bPos = eventBlock->GetPosition();
             glm::vec2 pSize = m_Player->GetScaledSize();
             glm::vec2 bSize = eventBlock->GetScaledSize();
 
-            // 🌟 關鍵修正1：把 X 軸容錯加到 15.0f，抵銷物理引擎的「力場排斥」距離！
-            bool touchX = std::abs(pPos.x - bPos.x) <= ((pSize.x + bSize.x) / 2.0f) + 15.0f;
+            // 🌟 核心記憶體：記住貓咪上一刻到底在左邊還是右邊！
+            static bool wasOnLeft = true;
+
+            // 如果貓咪完全退到旗桿左邊安全區，就記住它在左邊
+            if (pPos.x < bPos.x - (bSize.x / 2.0f) - 5.0f) {
+                wasOnLeft = true;
+            }
+            // 如果貓咪完全退到旗桿右邊安全區，就記住它在右邊
+            else if (pPos.x > bPos.x + (bSize.x / 2.0f) + 5.0f) {
+                wasOnLeft = false;
+            }
+
+            // 算觸碰範圍 (因為步驟1已經把物理推擠拔掉了，容錯值用正常的 2.0f 即可)
+            bool touchX = std::abs(pPos.x - bPos.x) <= ((pSize.x + bSize.x) / 2.0f) + 2.0f;
             bool touchY = std::abs(pPos.y - bPos.y) <= ((pSize.y + bSize.y) / 2.0f) + 2.0f;
 
-            // 如果碰到了，且貓咪是從左邊來的
-            if (touchX && touchY && pPos.x < bPos.x)
+            // 🌟 只有當貓咪碰到旗桿，而且是「從左邊來的 (wasOnLeft)」，才觸發動畫！
+            if (touchX && touchY && wasOnLeft)
             {
                 LOG_INFO("觸發過關旗桿！");
                 m_FlagAnimPhase = 1;
 
-                // 惡意判定：貓咪的 Y 座標如果大於旗桿的 Y 座標 (代表在 1/2 以上的上半部)
+                // 惡意判定：貓咪的 Y 座標如果大於旗桿的 Y 座標
                 m_IsTrollFlagDeath = (pPos.y > bPos.y);
-
-                // 計算旗桿底部的 Y 座標，讓貓咪等一下能滑到底部
                 m_FlagBottomY = bPos.y - (bSize.y / 2.0f) + (pSize.y / 2.0f);
 
-                // 🌟 關鍵修正2：精準吸附在旗桿邊緣，避免陷太深被同幀的物理引擎往外彈
-                float snapX = bPos.x - (bSize.x / 2.0f) - (pSize.x / 2.0f) + 8.0f;
+                // 吸附到左側邊緣
+                float snapX = bPos.x - (bSize.x / 2.0f) - (pSize.x / 2.0f);
+
                 m_Player->SetPosition({snapX, pPos.y});
+
             }
         }
         if (eventBlock && eventBlock->GetEventID() == 91)
@@ -431,23 +525,22 @@ void App::Update() {
             glm::vec2 pPos = m_Player->GetPosition();
             glm::vec2 bPos = eventBlock->GetPosition();
             eventBlock->SetDrawable(ImageManager::Get("fly_teki_2"));
-            // 條件：貓咪在方塊下方，且 X 軸距離靠近 (80像素內，可自己微調)
+
             bool is_under = pPos.y < bPos.y;
             bool is_alignedX = std::abs(bPos.x - pPos.x) < 80.0f;
 
-            // 只要滿足條件，不需要管狀態，直接往下砸！
-            if (is_under && is_alignedX)
+            if (is_under && is_alignedX && !eventBlock->HasSpawned())
             {
-                eventBlock->Activate();
+                eventBlock->SetSpawned(true); // 🌟 改用 SetSpawned
                 eventBlock->SetVisible(true);
             }
-            if (eventBlock->IsActivated())
+
+            if (eventBlock->HasSpawned()) // 🌟 改用 HasSpawned
             {
-                bPos.y-=15.0f;
+                bPos.y -= 15.0f;
                 eventBlock->SetPosition(bPos);
                 if (m_Player->IfCollidesWithBlock(eventBlock))
                 {
-
                     m_Player->Die();
                 }
             }
@@ -521,7 +614,7 @@ void App::Update() {
 
                     // 如果撞到了！
                     if (colX && colY) {
-                        LOG_INFO("保齡球 Strike！烏龜殼撞死了怪物！");
+
 
                         enemyB->Die(); // 被撞到的怪物當場死亡
 

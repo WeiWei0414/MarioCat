@@ -176,6 +176,13 @@ LevelDate MapManager::LoadMap(const std::string& filePath)
                         level.blocks.push_back(deco);
                         break;
                     }
+                case 86:
+                    {
+                        auto deco = std::make_shared<Decoration>("end");
+                        deco->SetPosition(pos);
+                        level.decorations.push_back(deco);
+                        break;
+                    }
                 case 91:{ //會往上移
                         auto block = std::make_shared<EventBlock>("brick_2",tileID);
                         block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
