@@ -21,11 +21,15 @@ public:
     // 🌟 新增：讓外部可以設定怪物的速度 (水管噴怪物會用到！)
     void SetVelocity(const glm::vec2& velocity) { m_Velocity = velocity; }
     void SetDirection(float direction) { m_Direction = direction; }
+    [[nodiscard]] bool IsPoweredUp() const { return m_IsPoweredUp; }
+
+    // 🌟 新增 2：加上 virtual，讓子類別 (如 NormalEnemy) 可以自己決定變大長什麼樣子
+    virtual void PowerUp() {}
 protected: // 🌟 關鍵：改成 protected！這樣兒子們才拿得到這些變數
     float m_Speed = 1.0f;
     float m_Direction = -1.0f;
     bool m_IsDead = false;
-
+    bool m_IsPoweredUp = false;
     // 探測懸崖的工具留給所有走地怪物共用
     [[nodiscard]] bool IsGroundAhead(const std::vector<std::shared_ptr<Block>>& blocks) const;
 };

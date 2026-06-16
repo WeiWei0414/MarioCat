@@ -14,22 +14,22 @@
 #include "EventBlock.hpp"
 #include "FlyingEnemy.hpp"
 #include "NormalEnemy.hpp"
+#include "HiddenBlock.hpp"
+#include "SpikyEnemy.hpp"
 void App::Start() {
     LOG_TRACE("Start");
 
     ImageManager::LoadAll();
-    m_Player=std::make_shared<Player>();
-    m_Player->SetPosition({-500.0f, 0.0f});
+    m_Player = std::make_shared<Player>();
+    // 這裡不用 SetPosition 了，LoadLevel 裡面會做
 
-    LevelDate mydata=MapManager::LoadMap(RESOURCE_DIR "/Map/level1.txt");
-    m_Blocks=mydata.blocks;
-    m_Enemies=mydata.enemies;
-    m_Decorations = mydata.decorations;
-    m_Background=std::make_shared<Util::GameObject>();
+    m_Background = std::make_shared<Util::GameObject>();
     m_Background->SetDrawable(ImageManager::Get("bg_blue"));
     m_Background->SetZIndex(-10);
-
+    m_CurrentLevel = 3;
+    LoadLevel(m_CurrentLevel);
     m_CurrentState = State::UPDATE;
+
 }
 
 void App::Update() {
@@ -37,21 +37,48 @@ void App::Update() {
     m_Background->Draw();
     // 3. 攝影機與縮放設定
     float startCameraX = -213.0f;
-    static float maxCameraX = startCameraX;
-
     float targetCameraX = std::max(startCameraX, m_Player->GetPosition().x);
-    float zoom = 1.5f; // 🌟 你的放大倍率，大於 1 就是放大
+    float zoom = 1.5f;
 
-    if (targetCameraX > maxCameraX) {
-        maxCameraX = targetCameraX;
+    // 🌟 全面換成 m_MaxCameraX
+    if (targetCameraX > m_MaxCameraX) {
+        m_MaxCameraX = targetCameraX;
     }
-    float cameraX = maxCameraX;
+    float cameraX = m_MaxCameraX;
 
-    // 左側隱形牆限制 (如果你覺得放大後能往回走的空間變大了，可以把這裡的 -600.0f 調小一點)
+    // 左側隱形牆限制
     float leftEdge = cameraX - 385.0f;
-    if (m_Player->GetPosition().x < leftEdge)
+
+
+
+    if (m_HorizPipePhase == 0 &&m_Player->GetPosition().x < leftEdge)
     {
         m_Player->SetPosition({leftEdge, m_Player->GetPosition().y});
+    }
+    if (m_HorizPipePhase == 0 && Util::Input::IsKeyDown(Util::Keycode::D)) {
+        for (auto& block : m_Blocks) {
+            auto eventBlock = std::dynamic_pointer_cast<EventBlock>(block);
+            if (eventBlock && eventBlock->GetEventID() == 411) {
+
+                glm::vec2 pPos = m_Player->GetPosition();
+                glm::vec2 bPos = eventBlock->GetPosition();
+
+                // 條件判斷：貓咪在左邊、Y軸對齊、且距離很近
+                bool is_left = pPos.x < bPos.x;
+                bool is_alignedY = std::abs(pPos.y - bPos.y) < 20.0f;
+                // 計算貓咪右邊緣跟水管左邊緣的距離
+                float distX = std::abs((bPos.x - eventBlock->GetScaledSize().x / 2.0f) - (pPos.x + m_Player->GetScaledSize().x / 2.0f));
+
+                if (is_left && is_alignedY && distX < 15.0f) {
+                    m_HorizPipePhase = 1;
+                    m_HorizPipeTimer = 25; // 階段 1：慢慢走進去的時間 (可微調)
+
+                    m_Player->SetZIndex(-1); // 躲到水管圖層後面
+                    m_Player->SetPosition({pPos.x, bPos.y}); // 強制把 Y 軸對齊水管中心
+                    break;
+                }
+            }
+        }
     }
     if (m_PipeAnimPhase == 0 && Util::Input::IsKeyDown(Util::Keycode::S)) {
         for (auto& block : m_Blocks) {
@@ -66,7 +93,7 @@ void App::Update() {
                 float distY = std::abs((pPos.y - m_Player->GetScaledSize().y / 2.0f) - (bPos.y + eventBlock->GetScaledSize().y / 2.0f));
 
                 if (is_above && is_alignedX && distY < 10.0f) {
-                    LOG_INFO("階段1：貓咪開始下沉！");
+
 
                     // 🌟 設定進入第一階段
                     m_PipeAnimPhase = 1;
@@ -95,6 +122,112 @@ void App::Update() {
                 }
             }
         }
+    }
+    // ==========================================
+    // 🌟 44號：通關水管 (按 S 進入並切換關卡)
+    // ==========================================
+    if (m_ClearPipePhase == 0 && Util::Input::IsKeyDown(Util::Keycode::S)) {
+        for (auto& block : m_Blocks) {
+            auto eventBlock = std::dynamic_pointer_cast<EventBlock>(block);
+            if (eventBlock && eventBlock->GetEventID() == 44) {
+
+                glm::vec2 pPos = m_Player->GetPosition();
+                glm::vec2 bPos = eventBlock->GetPosition();
+
+                bool is_above = pPos.y > bPos.y;
+                bool is_alignedX = std::abs(pPos.x - bPos.x) < 20.0f;
+                // 計算貓咪腳底與水管頂部的距離
+                float distY = std::abs((pPos.y - m_Player->GetScaledSize().y / 2.0f) - (bPos.y + eventBlock->GetScaledSize().y / 2.0f));
+
+                // 只有站在水管正上方且距離很近時才觸發
+                if (is_above && is_alignedX && distY < 10.0f) {
+
+
+                    m_ClearPipePhase = 1;
+                    m_ClearPipeTimer = 60; // 沉下去的時間 (60幀大約1秒)
+
+                    m_Player->SetZIndex(-1); // 躲到水管圖層後面
+                    m_Player->SetPosition({bPos.x, pPos.y}); // X軸強制對齊水管中心
+                    break;
+                }
+            }
+        }
+    }
+    if (m_ClearPipePhase > 0) {
+        glm::vec2 pos = m_Player->GetPosition();
+
+        if (m_ClearPipePhase == 1) {
+            pos.y -= 1.5f; // 貓咪慢慢下沉
+            m_ClearPipeTimer--;
+
+            // 當計時器結束 (貓咪已經完全沉入水管)
+            if (m_ClearPipeTimer <= 0) {
+                LOG_INFO("水管通關！前往下一關！");
+                m_CurrentLevel++;
+                LoadLevel(m_CurrentLevel); // 載入第三關
+
+                // 🌟 絕對防禦魔法：防止幽靈座標，載入完立刻退出這一幀！
+                return;
+            }
+        }
+
+        m_Player->SetPosition(pos);
+
+        // --- 繪圖 (維持動畫期間的畫面，不執行普通物理與操控) ---
+        RenderWithCamera(m_Blocks, cameraX, zoom);
+        RenderWithCamera(m_Enemies, cameraX, zoom);
+        RenderWithCamera(m_Decorations, cameraX, zoom);
+        RenderWithCamera(m_Coins, cameraX, zoom); // 順便把金幣也畫出來以免消失
+
+        glm::vec2 realPlayerPos = m_Player->GetPosition();
+        m_Player->SetPosition({(realPlayerPos.x - cameraX) * zoom, realPlayerPos.y * zoom});
+        m_Player->SetScale({zoom, zoom});
+        m_Player->Draw();
+        m_Player->SetPosition(realPlayerPos);
+        m_Player->SetScale({1.0f, 1.0f});
+
+        return; // 凍結其他所有操作
+    }
+    if (m_HorizPipePhase > 0) {
+        glm::vec2 pos = m_Player->GetPosition();
+
+        // --- 階段 1：慢慢走進水管 ---
+        if (m_HorizPipePhase == 1) {
+            pos.x += 1.5f; // 模擬走路速度
+            m_HorizPipeTimer--;
+
+            if (m_HorizPipeTimer <= 0) {
+                m_HorizPipePhase = 2; // 準備噴射
+            }
+        }
+        // --- 階段 2：超高速向左噴射 ---
+        else if (m_HorizPipePhase == 2) {
+            pos.x -= 15.0f; // 🌟 超高速向左衝刺！(數字越大飛越快)
+
+            // 檢查是否飛出畫面左邊界 (假設攝影機左邊緣再往左 200 像素)
+            if (pos.x < cameraX - 1000.0f) {
+
+                m_Player->SetZIndex(5);  // 把圖層拉回來
+                m_Player->Die();         // 死亡判定
+                m_HorizPipePhase = 0;    // 結束動畫
+            }
+        }
+
+        m_Player->SetPosition(pos);
+
+
+        RenderWithCamera(m_Blocks, cameraX, zoom);
+        RenderWithCamera(m_Enemies, cameraX, zoom);
+        RenderWithCamera(m_Decorations, cameraX, zoom);
+
+        glm::vec2 realPlayerPos = m_Player->GetPosition();
+        m_Player->SetPosition({(realPlayerPos.x - cameraX) * zoom, realPlayerPos.y * zoom});
+        m_Player->SetScale({zoom, zoom});
+        m_Player->Draw();
+        m_Player->SetPosition(realPlayerPos);
+        m_Player->SetScale({1.0f, 1.0f});
+
+        return; // 凍結其他所有操作
     }
     if (m_PipeAnimPhase > 0) {
 
@@ -214,9 +347,9 @@ if (m_FlagAnimPhase > 0) {
 
             // 原地不動，純計時 (60 幀 = 1 秒)
             if (m_FlagAnimTimer > 60) {
-                LOG_INFO("安全通關！");
-                m_FlagAnimPhase = 0;
-                m_CurrentState = State::END; // 真正結束遊戲
+                m_CurrentLevel++;
+                LoadLevel(m_CurrentLevel);
+                return;
             }
         }
 
@@ -229,7 +362,6 @@ if (m_FlagAnimPhase > 0) {
         for (auto& enemy : m_Enemies)
         {
             enemy->Update(m_Blocks);
-
             if (std::dynamic_pointer_cast<FlyingEnemy>(enemy)!=nullptr)
             {
                 glm::vec2 Pos = enemy->GetPosition();
@@ -300,8 +432,46 @@ if (m_FlagAnimPhase > 0) {
 
         return; // 凍結其他所有操作
     }
+    //大部分陷阱
     for (auto& block : m_Blocks)
     {
+        // ==========================================
+        // 🌟 處理隱藏方塊 (HiddenBlock) 的頂撞與噴金幣
+        // ==========================================
+        auto hiddenBlock = std::dynamic_pointer_cast<HiddenBlock>(block);
+        if (hiddenBlock)
+        {
+            // 如果它還是隱形的，我們才需要偵測貓咪有沒有頂它
+            if (hiddenBlock->IsHidden())
+            {
+                glm::vec2 pPos = m_Player->GetPosition();
+                glm::vec2 bPos = hiddenBlock->GetPosition();
+
+                bool is_under = pPos.y < bPos.y;
+                bool is_alignedX = std::abs(bPos.x - pPos.x) < 30.0f;
+
+                // 動態預判觸碰距離
+                float touchDistance = (hiddenBlock->GetScaledSize().y / 2.0f) + (m_Player->GetScaledSize().y / 2.0f) + m_Player->GetVelocity().y + 2.0f;
+                bool is_touching = (bPos.y - pPos.y) <= touchDistance;
+
+                // 只有當貓咪「往上跳 (Velocity.y > 0)」，且頭頂撞到方塊底部時才觸發！
+                if (is_under && is_alignedX && is_touching && m_Player->GetVelocity().y > 0.0f)
+                {
+                    LOG_INFO("敲出隱藏方塊！");
+
+                    // 1. 呼叫你寫好的 Reveal()，讓它顯形並換圖！
+                    hiddenBlock->Reveal();
+
+                    // 2. 噴出金幣！
+                    glm::vec2 coinPos = hiddenBlock->GetPosition();
+                    coinPos.y += hiddenBlock->GetScaledSize().y;
+                    m_Coins.push_back(std::make_shared<Coin>(coinPos));
+
+                    // 3. 物理回饋：強制把貓咪往下彈，營造「撞到磚塊」的手感
+                    m_Player->SetVelocity({m_Player->GetVelocity().x, -2.0f});
+                }
+            }
+        }
         auto eventBlock = std::dynamic_pointer_cast<EventBlock>(block);
         if (eventBlock && eventBlock->GetEventID() == 83)
         {
@@ -323,6 +493,98 @@ if (m_FlagAnimPhase > 0) {
                 }
 
                 m_Player->Die();
+            }
+        }
+        if (eventBlock && eventBlock->GetEventID() == 45)
+        {
+            if (m_SpawnCounts[eventBlock] >= 2)
+            {
+                continue;
+            }
+
+            glm::vec2 pPos = m_Player->GetPosition();
+            glm::vec2 bPos = eventBlock->GetPosition();
+
+            // 雷達範圍
+            bool is_closeX = std::abs(pPos.x - bPos.x) < 200.0f;
+            bool is_closeY = std::abs(pPos.y - bPos.y) < 300.0f;
+
+            if (is_closeX && is_closeY)
+            {
+                // 2. 查閱畫面上是否已有怪物存活
+                bool canSpawn = true;
+                if (m_SpawnerTracker.count(eventBlock) > 0) {
+                    if (!m_SpawnerTracker[eventBlock].expired()) {
+                        canSpawn = false; // 畫面上那隻還活著，不准生！
+                    }
+                }
+
+                // 3. 如果可以生成 (上一次生成的已經徹底死掉清空了)
+                if (canSpawn)
+                {
+                    // 🌟 關鍵新增：累計這塊方塊的生成次數！
+                    m_SpawnCounts[eventBlock]++;
+
+                    auto enemy = std::make_shared<NormalEnemy>("cat_teki");
+
+                    float blockHalfHeight = eventBlock->GetScaledSize().y / 2.0f;
+                    float enemyHalfHeight = enemy->GetScaledSize().y / 2.0f;
+                    float spawnY = bPos.y + blockHalfHeight + enemyHalfHeight + 2.0f;
+                    enemy->SetPosition({bPos.x, spawnY});
+
+                    enemy->SetVelocity({0.0f, 9.0f});
+                    float dir = (pPos.x < bPos.x) ? -1.0f : 1.0f;
+                    enemy->SetDirection(dir);
+
+                    m_Enemies.push_back(enemy);
+
+                    // 登錄到監視名單
+                    m_SpawnerTracker[eventBlock] = enemy;
+                }
+            }
+        }
+        if (eventBlock && eventBlock->GetEventID() == 53)
+        {
+            // 確保這個陷阱還沒發射過
+            if (!eventBlock->HasSpawned())
+            {
+                glm::vec2 pPos = m_Player->GetPosition();
+                glm::vec2 bPos = eventBlock->GetPosition();
+
+                // 1. 設定感應雷達範圍：X 軸距離小於 100 像素 (玩家非常靠近了)
+                bool is_closeX = std::abs(pPos.x - bPos.x) < 100.0f;
+
+                // (選用) Y 軸高度限制：確保貓咪不要離方塊太遠 (例如在天上飛時不要誤觸)
+                bool is_closeY = std::abs(pPos.y - bPos.y) < 300.0f;
+
+                // 2. 只要玩家踏入雷達範圍
+                if (is_closeX && is_closeY)
+                {
+
+
+                    auto enemy = std::make_shared<SpikyEnemy>("spiky_teki");
+
+                    // ==========================================
+                    // 🌟 關鍵修正：精算出生高度，確保完全不跟方塊重疊！
+                    // ==========================================
+                    float blockHalfHeight = eventBlock->GetScaledSize().y / 2.0f;
+                    float enemyHalfHeight = enemy->GetScaledSize().y / 2.0f;
+
+                    // 加上兩者的半高，再額外多加 2.0 像素的安全距離
+                    float spawnY = bPos.y + blockHalfHeight + enemyHalfHeight + 2.0f;
+                    enemy->SetPosition({bPos.x, spawnY});
+
+                    // 重新賦予向上的彈射初速度！
+                    enemy->SetVelocity({0.0f, 15.0f});
+                    enemy->SetDirection(-1);
+                    // 🌟 智能追蹤：讓怪物一彈出來，就朝著玩家的方向走！
+                    // (如果玩家在左邊，dir 就是 -1.0f；在右邊就是 1.0f)
+                    float dir = (pPos.x < bPos.x) ? -1.0f : 1.0f;
+                    enemy->SetDirection(dir);
+
+                    m_Enemies.push_back(enemy);
+                    eventBlock->SetSpawned(true);
+                }
             }
         }
         if (eventBlock && eventBlock->GetEventID() == 84)
@@ -401,6 +663,53 @@ if (m_FlagAnimPhase > 0) {
                 {
                     m_Player->Die();
                 }
+            }
+        }
+        if (eventBlock && eventBlock->GetEventID() == 88)
+        {
+            glm::vec2 pPos = m_Player->GetPosition();
+            glm::vec2 bPos = eventBlock->GetPosition();
+            glm::vec2 pSize = m_Player->GetScaledSize();
+            glm::vec2 bSize = eventBlock->GetScaledSize();
+
+            // 1. 條件判定：貓咪必須在方塊上方，且 X 軸有重疊
+            // (X 軸容錯減去 4.0f，避免玩家只是從邊緣擦過去也被刺死)
+            bool is_above = pPos.y > bPos.y;
+            bool is_alignedX = std::abs(bPos.x - pPos.x) < ((pSize.x + bSize.x) / 2.0f) - 4.0f;
+
+            // 2. 計算距離：精算「貓咪腳底板」與「方塊頂部」的距離
+            float distY = std::abs((pPos.y - pSize.y / 2.0f) - (bPos.y + bSize.y / 2.0f));
+
+            // 3. 當距離極近 (貼在上面)，且貓咪「往下掉落或站立 (Velocity.y <= 0)」時觸發！
+            if (is_above && is_alignedX && distY <= 2.0f && m_Player->GetVelocity().y <= 0.0f)
+            {
+                // 如果陷阱還沒被觸發過，就讓尖刺現形！
+                if (is_above && is_alignedX && distY <= 2.0f && m_Player->GetVelocity().y <= 0.0f)
+                {
+                    if (!eventBlock->HasSpawned())
+                    {
+
+                        auto spike = std::make_shared<Decoration>("spike");
+
+                        // 設定座標：讓尖刺比方塊稍微高一點點，營造「刺穿出來」的感覺
+                        glm::vec2 spikePos = bPos;
+
+                        spike->SetPosition(spikePos);
+
+                        // 設定圖層：讓尖刺畫在方塊的上面
+                        spike->SetZIndex(-5);
+
+                        // 丟進大管家的裝飾品清單！
+                        // 這樣它就會跟著畫面一起被畫出來，而且完全「沒有物理碰撞」，不會干擾系統！
+                        m_Decorations.push_back(spike);
+
+                        eventBlock->SetSpawned(true);
+                    }
+
+
+                    m_Player->Die(); // 無情擊殺
+                }
+
             }
         }
         if (eventBlock && eventBlock->GetEventID() == 99 && m_FlagAnimPhase == 0)
@@ -580,6 +889,11 @@ if (m_FlagAnimPhase > 0) {
     for (auto& enemy : m_Enemies)
     {
         enemy->Update(m_Blocks);
+        if (enemy->GetPosition().y < -400.0f)
+        {
+            enemy->Die();
+            continue;
+        }
         if (std::dynamic_pointer_cast<FlyingEnemy>(enemy)!=nullptr)
         {
             glm::vec2 Pos = enemy->GetPosition();
@@ -674,11 +988,14 @@ if (m_FlagAnimPhase > 0) {
         {
             // 判斷貓咪是否從上方掉落踩中敵人
             bool isFallingOnEnemy = (m_Player->GetVelocity().y < 0.0f && m_Player->GetPosition().y > enemy->GetPosition().y);
-
+            auto spiky = std::dynamic_pointer_cast<SpikyEnemy>(enemy);
             // 嘗試將敵人轉為烏龜，看看它是不是烏龜
             auto turtle = std::dynamic_pointer_cast<TurtleEnemy>(enemy);
-
-            if (turtle)
+            if (spiky)
+            {
+                m_Player->Die();
+            }
+            else if(turtle)
             {
                 if (turtle->GetState() == TurtleState::WALKING) {
                     if (isFallingOnEnemy) {
@@ -732,8 +1049,31 @@ if (m_FlagAnimPhase > 0) {
                     m_Player->PowerUp();
                     break;
                 }
+            case 3:
+                m_Player->Die();
+                break;
             }
         }
+        for (auto& enemy : m_Enemies)
+        {
+            // 只有「還活著」的怪物，碰到蘑菇才會吃掉
+            if (!enemy->IsDead() && enemy->IfCollides(mushroom))
+            {
+                mushroom->Eat(); // 蘑菇被怪物吃掉了！
+
+                int ID = mushroom->GetTypeID();
+                if (ID == 1) {
+                    enemy->PowerUp(); // 怪物巨大化！
+                }
+                else if (ID == 3) {
+
+                    enemy->Die(); // (選用小彩蛋) 怪物吃到毒蘑菇直接被毒死！
+                }
+
+                break; // 蘑菇已經被這隻怪物吃了，不用再檢查其他怪物了
+            }
+        }
+
     }
     m_Enemies.erase(
         std::remove_if(m_Enemies.begin(), m_Enemies.end(), [](const std::shared_ptr<Enemy>& enemy) {
@@ -800,6 +1140,18 @@ if (m_FlagAnimPhase > 0) {
                     eventBlock->SetSpawned(true);
                     break;
                 }
+            case 31:
+                {
+                    auto mushroom = std::make_shared<Mushroom>("mushroom_3",3);
+                    glm::vec2 spawnPos=eventBlock->GetPosition();
+                    spawnPos.y += (eventBlock->GetScaledSize().y / 2.0f) + (mushroom->GetScaledSize().y / 2.0f) + 1.0f;
+                    mushroom->SetPosition(spawnPos);
+                    mushroom->SetVelocity({0.0f,5.0f});
+                    m_Mushrooms.push_back(mushroom);
+                    eventBlock->SetVisible(true);
+                    eventBlock->SetSpawned(true);
+                    break;
+                }
             case 96:
                 {
                     auto star = std::make_shared<StarEnemy>("star1");
@@ -822,8 +1174,7 @@ if (m_FlagAnimPhase > 0) {
     }
     if (Util::Input::IsKeyPressed(Util::Keycode::R))
     {
-        m_Player->SetPosition({-500.0f, 0.0f});
-        maxCameraX = -150.0f;
+        LoadLevel(m_CurrentLevel);
     }
 
     if (Util::Input::IsKeyUp(Util::Keycode::ESCAPE) ||
@@ -831,7 +1182,55 @@ if (m_FlagAnimPhase > 0) {
         m_CurrentState = State::END;
     }
 }
+void App::LoadLevel(int level) {
 
+    // 1. 大掃除：清空上一關殘留的所有物件
+    m_Blocks.clear();
+    m_Enemies.clear();
+    m_Decorations.clear();
+    m_Mushrooms.clear();
+    m_Coins.clear();
+    m_SpawnerTracker.clear();
+    m_SpawnCounts.clear();
+
+    // 2. 組合新的地圖路徑 (把 level 變成字串放進檔名)
+    std::string mapPath = RESOURCE_DIR "/Map/level" + std::to_string(level) + ".txt";
+
+    // 3. 讀取新地圖
+    LevelDate mydata = MapManager::LoadMap(mapPath);
+
+    // 🌟 防呆機制：如果回傳的地圖是空的，代表沒有下一關了 (全破！)
+    if (mydata.blocks.empty()) {
+
+        m_CurrentState = State::END;
+        return;
+    }
+
+    // 4. 把新關卡的資料交給大管家
+    m_Blocks = mydata.blocks;
+    m_Enemies = mydata.enemies;
+    m_Decorations = mydata.decorations;
+    if (level == 3) {
+        // 第三關專屬：X 更靠左 (-550.0f)，Y 從畫面最上方掉落 (600.0f 可依需求微調高度)
+        // 注意：預設攝影機左邊界大約是 -598.0f，所以 -550.0f 已經是非常貼近左邊緣的極限位置了！
+        m_Player->SetPosition({-570.0f, 600.0f});
+    } else {
+        // 第一關、第二關的預設起點
+        m_Player->SetPosition({-500.0f, 0.0f});
+    }
+    // 5. 重置貓咪位置與相關狀態
+
+
+    // 如果你有重置速度的方法也可以呼叫，例如 m_Player->SetVelocity({0.0f, 0.0f});
+    m_MaxCameraX = -213.0f;
+    // 6. 確保各種劇本動畫回到未觸發狀態
+    m_FlagAnimPhase = 0;
+    m_FlagAnimTimer = 0;
+    m_PipeAnimPhase = 0;
+    m_HorizPipePhase = 0;
+    m_ClearPipePhase = 0;
+    // (如果你還有其他的全域陷阱開關，記得要在這裡歸零)
+}
 void App::End() {
     LOG_TRACE("End");
 }

@@ -7,6 +7,7 @@
 #include "Decoration.hpp"
 #include "Coin.hpp"
 #include "Mushroom.hpp"
+#include <map>
 class App {
 public:
     enum class State {
@@ -25,14 +26,19 @@ public:
 
 private:
     void ValidTask();
+    int m_CurrentLevel = 2;
+    void LoadLevel(int level);
+
     State m_CurrentState = State::START;
     std::shared_ptr<Player> m_Player;
+    std::map<std::shared_ptr<Block>, std::weak_ptr<Enemy>> m_SpawnerTracker;
     std::vector<std::shared_ptr<Block>> m_Blocks;
     std::shared_ptr<Util::GameObject> m_Background;
     std::vector<std::shared_ptr<Enemy>> m_Enemies;
     std::vector<std::shared_ptr<Decoration>> m_Decorations;
     std::vector<std::shared_ptr<Coin>> m_Coins;
     std::vector<std::shared_ptr<Mushroom>> m_Mushrooms;
+    std::map<std::shared_ptr<Block>, int> m_SpawnCounts;
     int m_PipeAnimPhase = 0;
     int m_PipeAnimationTimer = 0;
     float m_OriginalPipeX = 0.0f;
@@ -40,6 +46,12 @@ private:
     int m_FlagAnimTimer = 0;
     bool m_IsTrollFlagDeath = false;
     float m_FlagBottomY = 0.0f;
+    int m_HorizPipePhase = 0;  // 0:未觸發, 1:走進去, 2:向左噴射
+    int m_HorizPipeTimer = 0;
+    float m_MaxCameraX = -213.0f;
+    int m_ClearPipePhase = 0;
+    int m_ClearPipeTimer = 0;
+
     template<typename T>
     void RenderWithCamera(const std::vector<std::shared_ptr<T>>& objects, float cameraX, float zoom) {
         for (auto& obj : objects) {

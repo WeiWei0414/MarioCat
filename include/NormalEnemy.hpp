@@ -15,7 +15,7 @@ public:
         : Enemy(imagePath), m_AvoidCliff(avoidCliff) {}
 
     void Update(const std::vector<std::shared_ptr<Block>>& blocks) override;
-
+    void PowerUp() override;
 private:
     bool m_AvoidCliff; // 🌟 宣告成員變數 (加上 m_ 區分)
 };

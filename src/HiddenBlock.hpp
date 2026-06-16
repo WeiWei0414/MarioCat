@@ -18,6 +18,7 @@ public:
     {
         if (m_IsHidden)
         {
+
             m_IsHidden=false;
             SetVisible(true);
             SetDrawable(ImageManager::Get("brick_3"));

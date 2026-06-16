@@ -60,6 +60,7 @@ add_executable(${PROJECT_NAME}
         include/FlyingEnemy.hpp
         include/TurtleEnemy.hpp
         src/TurtleEnemy.cpp
+        include/SpikyEnemy.hpp
 )
 
 if(MSVC)
