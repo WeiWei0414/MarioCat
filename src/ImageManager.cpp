@@ -40,17 +40,19 @@ void ImageManager::LoadAll()
     s_Images["end"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/end.png");
     s_Images["spiky_teki"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/spiky_teki.png");
     s_Images["spike"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/spike.png");
+    s_Images["item1"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/item1.png");
     //敵人
     s_Images["teki_1"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/teki_1.png");
     s_Images["teki_powerup"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/teki_powerup.png");
     s_Images["fly_teki"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/fly_teki.png");
     s_Images["cat_teki"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/cat_teki.png");
+    s_Images["fireball"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/fireball.png");
 
     s_Images["fly_teki_2"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/fly_teki_2.png");
     s_Images["star1"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/star1.png");
     s_Images["turtle_walk"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/turtle_walk.png");
     s_Images["turtle_shell"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/turtle_shell.png");
-    s_Images["bullet_1"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/bullet_1.png");
+    s_Images["bullet"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/bullet.png");
 }
 
 std::shared_ptr<Util::Image> ImageManager::Get(const std::string& name)

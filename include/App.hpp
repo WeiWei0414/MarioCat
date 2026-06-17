@@ -39,6 +39,10 @@ private:
     std::vector<std::shared_ptr<Coin>> m_Coins;
     std::vector<std::shared_ptr<Mushroom>> m_Mushrooms;
     std::map<std::shared_ptr<Block>, int> m_SpawnCounts;
+    std::map<std::shared_ptr<Block>, int> m_FireballTimers;
+    std::map<std::shared_ptr<Block>, glm::vec2> m_PlatformInitialPos;
+    std::map<std::shared_ptr<Block>, float> m_PlatformAngles;
+    int m_FireballInterval = 120;
     int m_PipeAnimPhase = 0;
     int m_PipeAnimationTimer = 0;
     float m_OriginalPipeX = 0.0f;

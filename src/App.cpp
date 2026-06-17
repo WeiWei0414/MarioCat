@@ -495,6 +495,64 @@ if (m_FlagAnimPhase > 0) {
                 m_Player->Die();
             }
         }
+        // ==========================================
+        // 🌟 46號：無限火球噴射器 (定時向上噴射，隨機弧線落下)
+        // ==========================================
+        if (eventBlock && eventBlock->GetEventID() == 46)
+        {
+            m_FireballTimers[eventBlock]++;
+
+            // 🌟 關鍵修改：從固定的 120 幀改成讀取全域的 m_FireballInterval
+            if (m_FireballTimers[eventBlock] >= m_FireballInterval)
+            {
+                m_FireballTimers[eventBlock] = 0;
+
+                auto fireball = std::make_shared<SpikyEnemy>("fireball");
+                fireball->SetAsFireball(true); // 讓牠獲得碰到地板就死亡的特權
+
+                glm::vec2 bPos = eventBlock->GetPosition();
+                float blockHalfHeight = eventBlock->GetScaledSize().y / 2.0f;
+                float fireballHalfHeight = fireball->GetScaledSize().y / 2.0f;
+                float spawnY = bPos.y + blockHalfHeight + fireballHalfHeight + 2.0f;
+                fireball->SetPosition({bPos.x, spawnY});
+
+                // 🌟 移動速度保持原本最完美的經典設定，不隨道具改變
+                fireball->SetVelocity({0.0f, 14.0f});
+
+                float randomDir = (rand() % 2 == 0) ? 1.0f : -1.0f;
+                fireball->SetDirection(randomDir);
+
+                m_Enemies.push_back(fireball);
+            }
+        }
+        // ==========================================
+        // 🌟 47號：火球狂暴道具 (玩家碰觸後吃掉，發射頻率翻倍)
+        // ==========================================
+        if (eventBlock && eventBlock->GetEventID() == 47)
+        {
+            glm::vec2 pPos = m_Player->GetPosition();
+            glm::vec2 bPos = eventBlock->GetPosition();
+            glm::vec2 pSize = m_Player->GetScaledSize();
+            glm::vec2 bSize = eventBlock->GetScaledSize();
+
+            // 🌟 核心修正：採用全方向 AABB 碰撞偵測（加上 2.0f 容錯，確保任何方向擦到都算數）
+            bool touchX = std::abs(pPos.x - bPos.x) <= ((pSize.x + bSize.x) / 2.0f) + 2.0f;
+            bool touchY = std::abs(pPos.y - bPos.y) <= ((pSize.y + bSize.y) / 2.0f) + 2.0f;
+
+            // 不管是從左、右、上、下哪一個角度碰到，只要 X 與 Y 同時重疊就觸發！
+            if (touchX && touchY)
+            {
+
+
+                m_FireballInterval /= 10;
+
+                if (m_FireballInterval < 20) m_FireballInterval = 20;
+
+                // 道具功成身退，將其標記為銷毀
+                eventBlock->SetDestoryed(true);
+            }
+        }
+
         if (eventBlock && eventBlock->GetEventID() == 45)
         {
             if (m_SpawnCounts[eventBlock] >= 2)
@@ -541,6 +599,46 @@ if (m_FlagAnimPhase > 0) {
                     // 登錄到監視名單
                     m_SpawnerTracker[eventBlock] = enemy;
                 }
+            }
+        }
+        if (eventBlock && eventBlock->GetEventID() == 48)
+        {
+            // 1. 初始化：如果是第一次遇到這個平台，記住它的起點
+            if (m_PlatformInitialPos.count(eventBlock) == 0) {
+                m_PlatformInitialPos[eventBlock] = eventBlock->GetPosition();
+                m_PlatformAngles[eventBlock] = 0.0f;
+            }
+
+            glm::vec2 oldBlockPos = eventBlock->GetPosition();
+
+            // 2. 預先偵測：在平台移動前，檢查貓咪是不是「正踩在平台上方」
+            glm::vec2 pPos = m_Player->GetPosition();
+            glm::vec2 pSize = m_Player->GetScaledSize();
+            glm::vec2 bSize = eventBlock->GetScaledSize();
+
+            bool is_above = pPos.y > oldBlockPos.y;
+            bool is_alignedX = std::abs(pPos.x - oldBlockPos.x) < ((pSize.x + bSize.x) / 2.0f) - 2.0f; // X軸有重疊
+            float distY = std::abs((pPos.y - pSize.y / 2.0f) - (oldBlockPos.y + bSize.y / 2.0f));     // 腳底距離平台頂部
+
+            // 只要距離小於 4 像素，就認定玩家正「騎」在升降梯上
+            bool isPlayerRiding = is_above && is_alignedX && distY <= 4.0f;
+
+            // 3. 移動平台：使用數學正弦波 (std::sin) 算出平滑的上下軌道
+            m_PlatformAngles[eventBlock] += 0.02f; // 🌟 控制移動速度 (數字越大擺動越快)
+
+            // 算出的新 Y 座標 = 初始高度 + (sin值 * 移動幅度)
+            float newBlockY = m_PlatformInitialPos[eventBlock].y + std::sin(m_PlatformAngles[eventBlock]) * 240.0f; // 🌟 120.0f 是上下移動的範圍半徑
+
+            eventBlock->SetPosition({oldBlockPos.x, newBlockY});
+
+            // 4. 🌟 核心魔法：如果玩家在上面，強行幫玩家補上平台的位移落差（Delta Y）！
+            if (isPlayerRiding)
+            {
+                float deltaY = newBlockY - oldBlockPos.y; // 算出平台這一幀移動了幾像素
+
+                glm::vec2 playerPos = m_Player->GetPosition();
+                playerPos.y += deltaY; // 讓貓咪同步上升或下降！
+                m_Player->SetPosition(playerPos);
             }
         }
         if (eventBlock && eventBlock->GetEventID() == 53)
@@ -818,16 +916,16 @@ if (m_FlagAnimPhase > 0) {
             {
                 eventBlock->Activate();
             }
-            if (eventBlock->IsActivated())
-            {
-                bPos.y-=15.0f;
-                eventBlock->SetPosition(bPos);
-                if (m_Player->IfCollidesWithBlock(eventBlock))
-                {
-
-                    m_Player->Die();
-                }
-            }
+            // if (eventBlock->IsActivated())
+            // {
+            //     bPos.y-=15.0f;
+            //     eventBlock->SetPosition(bPos);
+            //     if (m_Player->IfCollidesWithBlock(eventBlock))
+            //     {
+            //
+            //         m_Player->Die();
+            //     }
+            // }
         }
         if (eventBlock && eventBlock->GetEventID() == 52)
         {
@@ -858,12 +956,43 @@ if (m_FlagAnimPhase > 0) {
 
 
     }
+    bool is95Triggered = false;
+
+    // 1. 偵測階段：掃描是否有任何一個 95 號方塊被貓咪驚動了？
+    for (auto& block : m_Blocks) {
+        auto eb = std::dynamic_pointer_cast<EventBlock>(block);
+        if (eb && eb->GetEventID() == 95 && eb->IsActivated()) {
+            is95Triggered = true;
+            break; // 只要抓到一個啟動，全體連線成功！
+        }
+    }
+
+    // 2. 執行階段：如果連線成功，地圖上所有的 95 號方塊同步化身隕石砸下！
+    if (is95Triggered) {
+        for (auto& block : m_Blocks) {
+            auto eb = std::dynamic_pointer_cast<EventBlock>(block);
+            if (eb && eb->GetEventID() == 95) {
+
+                eb->Activate(); // 強制讓所有沒被驚動的 95 號也一起進入啟動狀態
+
+                glm::vec2 bPos = eb->GetPosition();
+                bPos.y -= 15.0f; // 保持原本 15.0f 的超神速下砸！
+                eb->SetPosition(bPos);
+
+                // 砸人判定（移到這裡後，整排方塊都有殺傷力！）
+                if (m_Player->IfCollidesWithBlock(eb)) {
+
+                    m_Player->Die();
+                }
+            }
+        }
+    }
     bool isFallingTriggered = false;
 
 
     for (auto& block : m_Blocks) {
         auto eb = std::dynamic_pointer_cast<EventBlock>(block);
-        if (eb && (eb->GetEventID() == 97 || eb->GetEventID() == 98) && eb->IsActivated()) {
+        if (eb && (eb->GetEventID() == 97 || eb->GetEventID() == 98 || eb->GetEventID() == 77) && eb->HasSpawned()) {
             isFallingTriggered = true;
             break; // 只要抓到一個被踩，就觸發全體機關！
         }
@@ -873,9 +1002,9 @@ if (m_FlagAnimPhase > 0) {
     if (isFallingTriggered) {
         for (auto& block : m_Blocks) {
             auto eb = std::dynamic_pointer_cast<EventBlock>(block);
-            if (eb && (eb->GetEventID() == 97 || eb->GetEventID() == 98)) {
+            if (eb && (eb->GetEventID() == 97 || eb->GetEventID() == 98 || eb->GetEventID() == 77)) {
 
-                eb->Activate(); // 強制全體連線進入啟動狀態
+                eb->SetSpawned(true);
 
                 glm::vec2 bPos = eb->GetPosition();
                 bPos.y -= 3.0f; // 🌟 掉落速度 (建議設 3.0f，讓物理引擎的重力能順暢帶著貓咪一起往下)
@@ -1192,6 +1321,10 @@ void App::LoadLevel(int level) {
     m_Coins.clear();
     m_SpawnerTracker.clear();
     m_SpawnCounts.clear();
+    m_FireballTimers.clear();
+    m_FireballInterval = 120;
+    m_PlatformInitialPos.clear();
+    m_PlatformAngles.clear();
 
     // 2. 組合新的地圖路徑 (把 level 變成字串放進檔名)
     std::string mapPath = RESOURCE_DIR "/Map/level" + std::to_string(level) + ".txt";

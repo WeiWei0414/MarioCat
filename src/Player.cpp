@@ -152,8 +152,8 @@ void Player::Update(const std::vector<std::shared_ptr<Block>>& blocks)
                     m_Velocity.y=0.0f;
                     m_LastSafePos=currentPos;
                     auto eventBlock = std::dynamic_pointer_cast<EventBlock>(block);
-                    if (eventBlock && (eventBlock->GetEventID() == 97 || eventBlock->GetEventID() == 98)) {
-                        eventBlock->Activate();
+                    if (eventBlock && (eventBlock->GetEventID() == 97 || eventBlock->GetEventID() == 98 || eventBlock->GetEventID() == 77)) {
+                        eventBlock->SetSpawned(true);
                     }
 
                 }
@@ -167,7 +167,7 @@ void Player::Update(const std::vector<std::shared_ptr<Block>>& blocks)
 
                     if (!eventBlock->IsActivated())
                     {
-                        std::vector<int> ignoreBumpIDs = {83, 97, 98,85,86};
+                        std::vector<int> ignoreBumpIDs = {83, 97, 98,85,86,47};
                         int currentID = eventBlock->GetEventID();
 
                         if (std::find(ignoreBumpIDs.begin(), ignoreBumpIDs.end(), currentID) == ignoreBumpIDs.end())
