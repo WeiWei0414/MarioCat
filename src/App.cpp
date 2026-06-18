@@ -21,12 +21,12 @@ void App::Start() {
 
     ImageManager::LoadAll();
     m_Player = std::make_shared<Player>();
-    // 這裡不用 SetPosition 了，LoadLevel 裡面會做
+
 
     m_Background = std::make_shared<Util::GameObject>();
     m_Background->SetDrawable(ImageManager::Get("bg_blue"));
     m_Background->SetZIndex(-10);
-    m_CurrentLevel = 3;
+    m_CurrentLevel = 4;
     LoadLevel(m_CurrentLevel);
     m_CurrentState = State::UPDATE;
 
@@ -123,6 +123,65 @@ void App::Update() {
             }
         }
     }
+    if (m_HorizClearPipePhase == 0 && Util::Input::IsKeyDown(Util::Keycode::D)) {
+        for (auto& block : m_Blocks) {
+            auto eventBlock = std::dynamic_pointer_cast<EventBlock>(block);
+            if (eventBlock && eventBlock->GetEventID() == 21) {
+
+                glm::vec2 pPos = m_Player->GetPosition();
+                glm::vec2 bPos = eventBlock->GetPosition();
+
+                // 條件判斷：貓咪在左邊、Y軸對齊、且距離很近 (完全借鑑 411 號的完美雷達！)
+                bool is_left = pPos.x < bPos.x;
+                bool is_alignedY = std::abs(pPos.y - bPos.y) < 20.0f;
+                float distX = std::abs((bPos.x - eventBlock->GetScaledSize().x / 2.0f) - (pPos.x + m_Player->GetScaledSize().x / 2.0f));
+
+                if (is_left && is_alignedY && distX < 15.0f) {
+                    m_HorizClearPipePhase = 1;
+                    m_HorizClearPipeTimer = 60; // 🌟 走進去的時間 (60幀大約 1 秒)
+
+                    m_Player->SetZIndex(-1); // 躲到水管圖層後面
+                    m_Player->SetPosition({pPos.x, bPos.y}); // 強制把 Y 軸對齊水管中心
+                    break;
+                }
+            }
+        }
+    }
+    if (m_HorizClearPipePhase > 0) {
+        glm::vec2 pos = m_Player->GetPosition();
+
+        if (m_HorizClearPipePhase == 1) {
+            pos.x += 1.5f; // 貓咪慢慢往右走入水管
+            m_HorizClearPipeTimer--;
+
+            // 當計時器結束 (貓咪已經完全沒入水管)
+            if (m_HorizClearPipeTimer <= 0) {
+                LOG_INFO("橫向水管通關！前往下一關！");
+                m_CurrentLevel++;
+                LoadLevel(m_CurrentLevel); // 載入新地圖
+
+                // 🌟 絕對防禦魔法：載入完立刻退出這一幀！
+                return;
+            }
+        }
+
+        m_Player->SetPosition(pos);
+
+        // --- 繪圖 (維持動畫期間的畫面，不執行普通物理與操控) ---
+        RenderWithCamera(m_Blocks, cameraX, zoom);
+        RenderWithCamera(m_Enemies, cameraX, zoom);
+        RenderWithCamera(m_Decorations, cameraX, zoom);
+        RenderWithCamera(m_Coins, cameraX, zoom);
+
+        glm::vec2 realPlayerPos = m_Player->GetPosition();
+        m_Player->SetPosition({(realPlayerPos.x - cameraX) * zoom, realPlayerPos.y * zoom});
+        m_Player->SetScale({zoom, zoom});
+        m_Player->Draw();
+        m_Player->SetPosition(realPlayerPos);
+        m_Player->SetScale({1.0f, 1.0f});
+
+        return; // 凍結其他所有日常操作
+    }
     // ==========================================
     // 🌟 44號：通關水管 (按 S 進入並切換關卡)
     // ==========================================
@@ -153,6 +212,67 @@ void App::Update() {
             }
         }
     }
+
+    if (m_DeathPipePhase == 0 && Util::Input::IsKeyDown(Util::Keycode::S)) {
+        for (auto& block : m_Blocks) {
+            auto eventBlock = std::dynamic_pointer_cast<EventBlock>(block);
+            if (eventBlock && eventBlock->GetEventID() == 49) {
+
+                glm::vec2 pPos = m_Player->GetPosition();
+                glm::vec2 bPos = eventBlock->GetPosition();
+
+                bool is_above = pPos.y > bPos.y;
+                bool is_alignedX = std::abs(pPos.x - bPos.x) < 20.0f;
+                float distY = std::abs((pPos.y - m_Player->GetScaledSize().y / 2.0f) - (bPos.y + eventBlock->GetScaledSize().y / 2.0f));
+
+                // 站在水管正上方且距離很近時觸發
+                if (is_above && is_alignedX && distY < 10.0f) {
+                    m_DeathPipePhase = 1;
+                    m_DeathPipeTimer = 45; // 🌟 沉下去的時間 (45幀大約 0.7 秒)
+
+                    m_Player->SetZIndex(-1); // 讓玩家躲到水管圖層後面
+                    m_Player->SetPosition({bPos.x, pPos.y}); // X軸強制對齊水管中心
+                    break;
+                }
+            }
+        }
+    }
+    if (m_DeathPipePhase > 0) {
+        glm::vec2 pos = m_Player->GetPosition();
+
+        if (m_DeathPipePhase == 1) {
+            pos.y -= 1.2f; // 貓咪慢慢往下沉入陷阱
+            m_DeathPipeTimer--;
+
+            // 當計時器結束 (貓咪已經陷進去大半身體了)
+            if (m_DeathPipeTimer <= 0) {
+                LOG_INFO("太貪心了！這根水管是致命陷阱！");
+
+                m_Player->SetZIndex(5); // 重新拉回正常圖層
+                m_Player->Die();        // 無情擊殺！
+                m_DeathPipePhase = 0;   // 關閉動畫狀態
+
+                return; // 絕對防禦：立刻退出這一幀，防止物理殘影
+            }
+        }
+
+        m_Player->SetPosition(pos);
+
+        // --- 繪圖 (凍結普通玩家操控與物理，只渲染動畫畫面) ---
+        RenderWithCamera(m_Blocks, cameraX, zoom);
+        RenderWithCamera(m_Enemies, cameraX, zoom);
+        RenderWithCamera(m_Decorations, cameraX, zoom);
+        RenderWithCamera(m_Coins, cameraX, zoom);
+
+        glm::vec2 realPlayerPos = m_Player->GetPosition();
+        m_Player->SetPosition({(realPlayerPos.x - cameraX) * zoom, realPlayerPos.y * zoom});
+        m_Player->SetScale({zoom, zoom});
+        m_Player->Draw();
+        m_Player->SetPosition(realPlayerPos);
+        m_Player->SetScale({1.0f, 1.0f});
+
+        return; // 凍結其他所有日常遊戲物理操作
+    }
     if (m_ClearPipePhase > 0) {
         glm::vec2 pos = m_Player->GetPosition();
 
@@ -162,7 +282,6 @@ void App::Update() {
 
             // 當計時器結束 (貓咪已經完全沉入水管)
             if (m_ClearPipeTimer <= 0) {
-                LOG_INFO("水管通關！前往下一關！");
                 m_CurrentLevel++;
                 LoadLevel(m_CurrentLevel); // 載入第三關
 
@@ -1326,6 +1445,7 @@ void App::LoadLevel(int level) {
     m_PlatformInitialPos.clear();
     m_PlatformAngles.clear();
 
+
     // 2. 組合新的地圖路徑 (把 level 變成字串放進檔名)
     std::string mapPath = RESOURCE_DIR "/Map/level" + std::to_string(level) + ".txt";
 
@@ -1362,6 +1482,10 @@ void App::LoadLevel(int level) {
     m_PipeAnimPhase = 0;
     m_HorizPipePhase = 0;
     m_ClearPipePhase = 0;
+    m_DeathPipePhase = 0; // 🌟 關鍵新增
+    m_DeathPipeTimer = 0;
+    m_HorizClearPipePhase = 0; // 🌟 關鍵新增：橫向通關重置
+    m_HorizClearPipeTimer = 0;
     // (如果你還有其他的全域陷阱開關，記得要在這裡歸零)
 }
 void App::End() {

@@ -29,6 +29,7 @@ void ImageManager::LoadAll()
     s_Images["fake_cloud"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/fake_cloud.png");
     s_Images["pipe"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/pipe.png");
     s_Images["pipe_left"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/pipe_left.png");
+    s_Images["long_pipe"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/long_pipe.png");
     s_Images["coin"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/coin.png");
     s_Images["sign"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/sign.png");
     s_Images["sign2"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/flag2.png");

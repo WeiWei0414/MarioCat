@@ -55,6 +55,10 @@ private:
     float m_MaxCameraX = -213.0f;
     int m_ClearPipePhase = 0;
     int m_ClearPipeTimer = 0;
+    int m_DeathPipePhase = 0;   // 🌟 0: 未觸發, 1: 下沉中
+    int m_DeathPipeTimer = 0;
+    int m_HorizClearPipePhase = 0; // 🌟 0: 未觸發, 1: 走入水管中
+    int m_HorizClearPipeTimer = 0;
 
     template<typename T>
     void RenderWithCamera(const std::vector<std::shared_ptr<T>>& objects, float cameraX, float zoom) {

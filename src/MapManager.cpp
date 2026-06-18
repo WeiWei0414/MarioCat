@@ -195,6 +195,39 @@ LevelDate MapManager::LoadMap(const std::string& filePath)
 
                         break;
                     }
+                case 49:
+                    {
+                        auto deco=std::make_shared<EventBlock>("pipe",tileID);
+                        deco->SetPosition(pos);
+                        deco->SetZIndex(2);
+                        level.blocks.push_back(deco);
+
+                        break;
+                    }
+                case 20:
+                    {
+                        auto deco=std::make_shared<EventBlock>("long_pipe",tileID);
+
+                        glm::vec2 signPos = pos;
+                        signPos.y+=15.0f;
+                        deco->SetPosition(signPos);
+                        deco->SetZIndex(2);
+
+                        level.blocks.push_back(deco);
+
+                        break;
+                    }
+                case 21:
+                    {
+                        auto deco=std::make_shared<EventBlock>("pipe_left",tileID);
+                        glm::vec2 signPos = pos;
+                        signPos.y-=10.0f;
+                        deco->SetPosition(pos);
+                        deco->SetZIndex(2);
+                        level.blocks.push_back(deco);
+
+                        break;
+                    }
                 case 50:
                     {
                         auto enemy=std::make_shared<NormalEnemy>("teki_1",false);
