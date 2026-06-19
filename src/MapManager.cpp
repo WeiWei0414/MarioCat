@@ -410,6 +410,10 @@ LevelDate MapManager::LoadMap(const std::string& filePath)
                     {
                         auto block = std::make_shared<EventBlock>("straght",tileID);
                         block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        glm::vec2 signPos = pos;
+                        signPos.y-=10.0f;
+                        block->SetPosition(signPos);
+                        block->SetZIndex(-9);
                         level.blocks.push_back(block);
                         break;
                     }
@@ -417,6 +421,10 @@ LevelDate MapManager::LoadMap(const std::string& filePath)
                     {
                         auto block = std::make_shared<EventBlock>("straght2",tileID);
                         block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        glm::vec2 signPos = pos;
+                        signPos.y-=10.0f;
+                        block->SetPosition(signPos);
+                        block->SetZIndex(-9);
                         level.blocks.push_back(block);
                         break;
                     }

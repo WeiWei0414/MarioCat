@@ -60,15 +60,24 @@ bool Player::IfCollidesWithBlock(const std::shared_ptr<Block>& block) const
 }
 void Player::Die()
 {
+    if (GetPosition().y < -400.0f) {
+        m_InvincibleTimer = 0.0f; // 沒收無敵
+        m_IsSuper = false;        // 沒收巨大化
+    }
+
+    // 原本的邏輯：如果有無敵或正在死亡中，就退出
     if (IsInvincible() || m_IsDying) return;
+
     if (m_IsSuper)
     {
         m_IsSuper = false;
         SetImage("player_idle");
         m_LastSafePos = {700.0f, -120.0f};
+        return; // 注意：這裡如果 m_IsSuper 被深淵沒收了，就不會進來這裡了，而是會直接往下執行真正的死亡！
     }
+
     m_IsDying = true;
-    m_Velocity = {0.0f, 12.0f}; // 死亡瞬間給予向上的初速度 (小跳躍)
+    m_Velocity = {0.0f, 12.0f};
     m_DeathCount++;
     SetImage("player_dead");
 }
@@ -76,9 +85,14 @@ void Player::Respawn()
 {
     m_IsDying = false; // 解除死亡狀態
 
+    // ==========================================
+    // 🌟 關鍵新增：強制洗白所有外加狀態！
+    // ==========================================
+    m_IsSuper = false;        // 強制拔除巨大化
+    m_InvincibleTimer = 2.0f; // 強制將 999999 的無敵時間覆蓋掉，變回重生的 2 秒保護
+
     m_Velocity = {0.0f, 0.0f};
-    m_InvincibleTimer = 2.0f;   // 給予無敵時間
-    SetImage("player_idle");    // 換回正常站立圖片
+    SetImage("player_idle");  // 換回正常站立圖片
 
 }
 void Player::Bounce()
@@ -207,8 +221,9 @@ void Player::Update(const std::vector<std::shared_ptr<Block>>& blocks)
     {
         m_Velocity.y=12.0f;
         m_IsGrounded=false;
-        // SetImage("player_jump");
+
 
     }
+
 
 }

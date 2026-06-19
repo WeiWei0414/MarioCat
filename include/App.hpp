@@ -50,17 +50,19 @@ private:
     int m_FlagAnimTimer = 0;
     bool m_IsTrollFlagDeath = false;
     float m_FlagBottomY = 0.0f;
-    int m_HorizPipePhase = 0;  // 0:未觸發, 1:走進去, 2:向左噴射
+    int m_HorizPipePhase = 0;
     int m_HorizPipeTimer = 0;
     float m_MaxCameraX = -213.0f;
     int m_ClearPipePhase = 0;
     int m_ClearPipeTimer = 0;
-    int m_DeathPipePhase = 0;   // 🌟 0: 未觸發, 1: 下沉中
+    int m_DeathPipePhase = 0;
     int m_DeathPipeTimer = 0;
-    int m_HorizClearPipePhase = 0; // 🌟 0: 未觸發, 1: 走入水管中
+    int m_HorizClearPipePhase = 0;
     int m_HorizClearPipeTimer = 0;
     int m_DeathTimer = 0;
     bool m_IsFakeFlagTriggered = false;
+    bool m_IsGameCleared = false;
+    std::shared_ptr<Util::GameObject> m_GameOverTextUI;
     std::map<std::shared_ptr<Block>, float> m_BlockVelocityY;
     std::shared_ptr<Util::GameObject> m_DeathTextUI;
     template<typename T>

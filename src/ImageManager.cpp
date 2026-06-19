@@ -8,7 +8,8 @@ std::map<std::string, std::shared_ptr<Util::Image>> ImageManager::s_Images;
 
 void ImageManager::LoadAll()
 {
-    s_Images["bg_blue"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/background_blue.png");
+    s_Images["bg_blue"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/background1.png");
+    s_Images["bg_black"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/background2.png");
     s_Images["player_idle"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/player_idle.png");
     s_Images["player_jump"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/player_jump.png");
     s_Images["player_dead"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/player_dead.png");

@@ -28,7 +28,7 @@ void App::Start() {
     m_Background = std::make_shared<Util::GameObject>();
     m_Background->SetDrawable(ImageManager::Get("bg_blue"));
     m_Background->SetZIndex(-10);
-    m_CurrentLevel = 4;
+    m_CurrentLevel = 1;
     LoadLevel(m_CurrentLevel);
     m_CurrentState = State::UPDATE;
 
@@ -36,7 +36,36 @@ void App::Start() {
 
 void App::Update() {
     // 1. 畫背景 (背景不受縮放與攝影機影響，直接填滿最底層)
-    m_Background->Draw();
+    if (m_IsGameCleared) {
+
+        // 1. 準備 UI 文字物件
+        if (!m_GameOverTextUI) {
+            m_GameOverTextUI = std::make_shared<Util::GameObject>();
+            m_GameOverTextUI->SetZIndex(100);
+
+            // 延續你使用的字體與顏色
+            auto textDrawable = std::make_shared<Util::Text>(
+                RESOURCE_DIR "/Font/NotoSansJP-Bold.ttf",
+                80, // 字體稍微調大一點更有壓迫感！
+                "Game over !",
+                Util::Color::FromName(Util::Colors::WHITE)
+            );
+
+            m_GameOverTextUI->SetDrawable(textDrawable);
+            m_GameOverTextUI->m_Transform.translation = glm::vec2(0.0f, 0.0f); // 放在畫面正中央
+        }
+
+        // 2. 🌟 執行階段：這幀「只」畫這個文字物件！不畫背景、不畫貓咪！
+        m_GameOverTextUI->Draw();
+
+        // 3. (選用) 讓玩家按 ESC 或 Enter 鍵可以直接關閉遊戲
+        if (Util::Input::IsKeyDown(Util::Keycode::ESCAPE) || Util::Input::IsKeyDown(Util::Keycode::RETURN)) {
+            m_CurrentState = State::END;
+        }
+
+        return; // 絕對防禦：凍結一切物理與遊戲邏輯！
+    }
+    //m_Background->Draw();
     if (m_Player->IsDying()) {
         m_DeathTimer++;
 
@@ -46,7 +75,7 @@ void App::Update() {
             m_Player->SetVelocity({0.0f, m_Player->GetVelocity().y - 0.5f});
             pos.y += m_Player->GetVelocity().y;
             m_Player->SetPosition(pos);
-
+            m_Background->Draw();
             // 畫出所有地圖物件與死亡彈跳的貓咪
             float freezeCameraX = m_MaxCameraX;
             float freezeZoom = 1.5f;
@@ -495,30 +524,36 @@ void App::Update() {
     // ==========================================
     // 🎬 劇本：旗桿過關動畫演出
     // ==========================================
-if (m_FlagAnimPhase > 0) {
+// ==========================================
+    // 🎬 劇本：旗桿過關動畫演出
+    // ==========================================
+    if (m_FlagAnimPhase > 0) {
         glm::vec2 pos = m_Player->GetPosition();
 
         if (m_FlagAnimPhase == 1) {
             // --- 階段 1：受重力影響掉落 ---
-            static float fallSpeed = 0.0f; // 靜態變數，用來記憶當前的下墜速度
-            fallSpeed += 0.8f;             // 🌟 重力加速度 (數字越大掉越快)
+            static float fallSpeed = 0.0f;
+            fallSpeed += 0.8f;
             pos.y -= fallSpeed;
 
-            // 🌟 半路死判定：只要到達死亡高度，直接中斷所有動畫！
+            // 半路死判定
             if (m_IsTrollFlagDeath && pos.y <= m_FlagBottomY + 80.0f) {
                 LOG_INFO("貪心的下場：滑桿半路死！動畫立刻中止！");
                 m_Player->Die();
                 m_FlagAnimPhase = 0;
-                fallSpeed = 0.0f;    // 🌟 記得歸零，以免下次遊玩時速度爆表
-                return;              // 🌟 立刻退出
+                fallSpeed = 0.0f;
+                return;
             }
 
             // 正常滑到底部的判斷
             if (pos.y <= m_FlagBottomY) {
-                pos.y = m_FlagBottomY; // 完美踩穩地板
-                m_FlagAnimPhase = 2;   // 準備走向右邊
+                pos.y = m_FlagBottomY;
+                m_FlagAnimPhase = 2;
                 m_FlagAnimTimer = 0;
-                fallSpeed = 0.0f;      // 🌟 落地後速度歸零
+                fallSpeed = 0.0f;
+
+                // 🌟 關鍵新增：落地瞬間把貓咪的真實 Y 軸速度歸零，以免等等套用重力時暴衝！
+                m_Player->SetVelocity({m_Player->GetVelocity().x, 0.0f});
             }
         }
         else if (m_FlagAnimPhase == 2) {
@@ -532,23 +567,21 @@ if (m_FlagAnimPhase > 0) {
                         glm::vec2 pPos = m_Player->GetPosition();
                         glm::vec2 bSize = eb->GetScaledSize();
 
-                        // 1. X 軸衝刺：101 號以高速 (15.0f) 衝向貓咪！
+                        // 101 號以高速 (15.0f) 衝向貓咪！
                         float dir = (pPos.x < flagPos.x) ? -1.0f : 1.0f;
                         flagPos.x += dir * 15.0f;
 
-                        // 2. 🌟 Y 軸重力系統：讓暴走的 101 號也能掉進坑洞！
+                        // 101 號專屬重力與地形碰撞
                         if (m_BlockVelocityY.count(eb) == 0) m_BlockVelocityY[eb] = 0.0f;
-                        m_BlockVelocityY[eb] -= 0.5f; // 重力下墜
+                        m_BlockVelocityY[eb] -= 0.5f;
                         flagPos.y += m_BlockVelocityY[eb];
 
-                        // 3. 🌟 地板碰撞偵測
                         for (const auto& ground : m_Blocks) {
                             if (ground == eb) continue;
 
                             auto groundEb = std::dynamic_pointer_cast<EventBlock>(ground);
                             if (groundEb) {
                                 int id = groundEb->GetEventID();
-                                // 忽略幽靈方塊與陷阱感應器
                                 if (id == 84 || id == 85 || id == 99 || id == 100 || id == 101 || id == 47) continue;
                             }
 
@@ -557,7 +590,6 @@ if (m_FlagAnimPhase > 0) {
                             bool colX = std::abs(flagPos.x - gPos.x) < ((bSize.x + gSize.x) / 2.0f);
                             bool colY = std::abs(flagPos.y - gPos.y) < ((bSize.y + gSize.y) / 2.0f);
 
-                            // 如果撞到地板，就停在地板上
                             if (colX && colY && m_BlockVelocityY[eb] < 0.0f) {
                                 flagPos.y = gPos.y + (gSize.y / 2.0f) + (bSize.y / 2.0f);
                                 m_BlockVelocityY[eb] = 0.0f;
@@ -565,15 +597,15 @@ if (m_FlagAnimPhase > 0) {
                             }
                         }
 
-                        // 更新 101 號最新座標
                         eb->SetPosition(flagPos);
 
-                        // 4. AABB 撞擊玩家判定
+                        // AABB 撞擊判定
                         glm::vec2 pSize = m_Player->GetScaledSize();
                         bool hitX = std::abs(pPos.x - flagPos.x) <= ((pSize.x + bSize.x) / 2.0f);
                         bool hitY = std::abs(pPos.y - flagPos.y) <= ((pSize.y + bSize.y) / 2.0f);
 
                         if (hitX && hitY) {
+                            LOG_INFO("絕望吧！被 101 號旗桿撞死了！");
                             m_Player->Die();
                             m_FlagAnimPhase = 0;
                             return;
@@ -598,10 +630,56 @@ if (m_FlagAnimPhase > 0) {
             // --- 🌟 階段 3：終點前停留 1 秒鐘 ---
             m_FlagAnimTimer++;
 
-            // 原地不動，純計時 (60 幀 = 1 秒)
             if (m_FlagAnimTimer > 60) {
                 m_CurrentLevel++;
                 LoadLevel(m_CurrentLevel);
+                return;
+            }
+        }
+
+        // ==========================================
+        // 🌟 貓咪過關走路/等待期間的專屬重力與碰撞系統
+        // ==========================================
+        if (m_FlagAnimPhase == 2 || m_FlagAnimPhase == 3) {
+
+            // 1. 讀取貓咪當前的速度，並套用重力下墜
+            glm::vec2 vel = m_Player->GetVelocity();
+            vel.y -= 0.5f;
+            pos.y += vel.y;
+
+            // 2. 簡單的地板碰撞偵測
+            glm::vec2 pSize = m_Player->GetScaledSize();
+            for (const auto& block : m_Blocks) {
+                auto eb = std::dynamic_pointer_cast<EventBlock>(block);
+                if (eb) {
+                    int id = eb->GetEventID();
+                    // 忽略幽靈方塊與陷阱感應器
+                    if (id == 84 || id == 85 || id == 99 || id == 100 || id == 101 || id == 47) continue;
+                }
+                auto hb = std::dynamic_pointer_cast<HiddenBlock>(block);
+                if (hb && hb->IsHidden()) continue; // 忽略還沒敲出來的隱形方塊
+
+                glm::vec2 bPos = block->GetPosition();
+                glm::vec2 bSize = block->GetScaledSize();
+
+                // 容錯防呆：X 軸縮小一點點避免卡在磚塊邊緣掉不下去
+                bool colX = std::abs(pos.x - bPos.x) < ((pSize.x + bSize.x) / 2.0f) - 4.0f;
+                bool colY = std::abs(pos.y - bPos.y) < ((pSize.y + bSize.y) / 2.0f);
+
+                // 如果撞到地板，就把貓咪抬起來並歸零 Y 軸速度
+                if (colX && colY && vel.y < 0.0f) {
+                    pos.y = bPos.y + (bSize.y / 2.0f) + (pSize.y / 2.0f);
+                    vel.y = 0.0f;
+                    break;
+                }
+            }
+            m_Player->SetVelocity(vel); // 把算好的速度存回貓咪身上
+
+            // 3. 🌟 終極惡意：如果走向城堡的路上掉進坑裡，一樣算死！
+            if (pos.y < -400.0f) {
+                LOG_INFO("太慘了！過關走向城堡的路上竟然掉進坑裡摔死！");
+                m_Player->Die();
+                m_FlagAnimPhase = 0;
                 return;
             }
         }
@@ -618,7 +696,7 @@ if (m_FlagAnimPhase > 0) {
             if (std::dynamic_pointer_cast<FlyingEnemy>(enemy)!=nullptr)
             {
                 glm::vec2 Pos = enemy->GetPosition();
-                Pos.y+=12.0f; // 飛行怪物往下掉
+                Pos.y+=12.0f;
                 enemy->SetPosition(Pos);
                 if (Pos.y>1000.0f)
                 {
@@ -659,7 +737,6 @@ if (m_FlagAnimPhase > 0) {
                     bPos.y -= 15.0f;
                     eb->SetPosition(bPos);
 
-                    // 動畫期間被偽裝方塊砸到，死！
                     if (m_Player->IfCollidesWithBlock(eb))
                     {
                         LOG_INFO("慘！過關途中被偽裝方塊砸死！");
@@ -1675,7 +1752,18 @@ if (m_FlagAnimPhase > 0) {
     }
 }
 void App::LoadLevel(int level) {
-
+    if (level > 4) {
+        m_IsGameCleared = true;
+        return; // 🌟 直接退出，不要再去讀取不存在的地圖檔！
+    }
+    if (level == 3) {
+        // 第三關換成專屬背景
+        // ⚠️ (請把 "bg_level3" 換成你實際載入的圖片名稱，例如 "bg_night" 或 "bg_dark")
+        m_Background->SetDrawable(ImageManager::Get("bg_black"));
+    } else {
+        // 其他關卡 (1, 2, 4) 維持原本的藍天白雲
+        m_Background->SetDrawable(ImageManager::Get("bg_blue"));
+    }
     // 1. 大掃除：清空上一關殘留的所有物件
     m_Blocks.clear();
     m_Enemies.clear();
