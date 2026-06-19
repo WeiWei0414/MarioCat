@@ -16,6 +16,8 @@
 #include "NormalEnemy.hpp"
 #include "HiddenBlock.hpp"
 #include "SpikyEnemy.hpp"
+#include "Util/Text.hpp"
+#include "Util/Color.hpp"
 void App::Start() {
     LOG_TRACE("Start");
 
@@ -34,6 +36,76 @@ void App::Start() {
 
 void App::Update() {
     // 1. 畫背景 (背景不受縮放與攝影機影響，直接填滿最底層)
+    m_Background->Draw();
+    if (m_Player->IsDying()) {
+        m_DeathTimer++;
+
+        // --- 階段 A：原地往上跳並掉落 (前 60 幀 = 1秒鐘) ---
+        if (m_DeathTimer <= 60) {
+            glm::vec2 pos = m_Player->GetPosition();
+            m_Player->SetVelocity({0.0f, m_Player->GetVelocity().y - 0.5f});
+            pos.y += m_Player->GetVelocity().y;
+            m_Player->SetPosition(pos);
+
+            // 畫出所有地圖物件與死亡彈跳的貓咪
+            float freezeCameraX = m_MaxCameraX;
+            float freezeZoom = 1.5f;
+
+            RenderWithCamera(m_Blocks, freezeCameraX, freezeZoom);
+            RenderWithCamera(m_Enemies, freezeCameraX, freezeZoom);
+            RenderWithCamera(m_Decorations, freezeCameraX, freezeZoom);
+            RenderWithCamera(m_Coins, freezeCameraX, freezeZoom);
+            RenderWithCamera(m_Mushrooms, freezeCameraX, freezeZoom);
+
+            glm::vec2 realPlayerPos = m_Player->GetPosition();
+            m_Player->SetPosition({(realPlayerPos.x - freezeCameraX) * freezeZoom, realPlayerPos.y * freezeZoom});
+            m_Player->SetScale({freezeZoom, freezeZoom});
+            m_Player->Draw();
+            m_Player->SetPosition(realPlayerPos);
+            m_Player->SetScale({1.0f, 1.0f});
+        }
+        // --- 階段 B：黑畫面結算 (60 ~ 120 幀 = 1秒) ---
+        else if (m_DeathTimer <= 120) {
+
+            // 在剛進入黑畫面的第一幀，我們把文字準備好
+            if (m_DeathTimer == 61) {
+
+                // 如果是第一次死掉，先幫 UI 申請記憶體
+                if (!m_DeathTextUI) {
+                    m_DeathTextUI = std::make_shared<Util::GameObject>();
+                    m_DeathTextUI->SetZIndex(100); // 確保它畫在最上層
+                }
+
+                // 1. 組合你要嘲諷玩家的文字字串
+                std::string deathMsg = "DEATH COUNT : " + std::to_string(m_Player->GetDeathCount());
+
+                // 2. 建立文字圖片 (參數依序為：字體路徑, 字體大小, 文字內容, 顏色)
+                // ⚠️ 如果你的字體檔名不同，請務必修改這裡的路徑！
+                auto textDrawable = std::make_shared<Util::Text>(
+                    RESOURCE_DIR "/Font/NotoSansJP-Bold.ttf",
+                    48,
+                    deathMsg,
+                    Util::Color::FromName(Util::Colors::WHITE)
+                );
+
+                // 3. 把文字貼上 UI 畫布，並設定在畫面正中央
+                m_DeathTextUI->SetDrawable(textDrawable);
+                m_DeathTextUI->m_Transform.translation = glm::vec2(0.0f, 0.0f);
+            }
+
+            // 🌟 執行階段：這 60 幀內，我們「只」畫這個文字物件！
+            // 不畫背景、不畫地圖、不畫貓咪，所以畫面除了這行白字之外，會是純粹的全黑！
+            m_DeathTextUI->Draw();
+        }
+        // --- 階段 C：重新載入關卡 ---
+        else {
+            m_Player->Respawn(); // 恢復貓咪的站立圖片與無敵時間
+            m_DeathTimer = 0;    // 計時器歸零
+            LoadLevel(m_CurrentLevel);
+        }
+
+        return; // 立刻退出這幀，不執行任何普通遊戲邏輯
+    }
     m_Background->Draw();
     // 3. 攝影機與縮放設定
     float startCameraX = -213.0f;

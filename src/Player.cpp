@@ -60,24 +60,26 @@ bool Player::IfCollidesWithBlock(const std::shared_ptr<Block>& block) const
 }
 void Player::Die()
 {
-    if (IsInvincible()) return;
+    if (IsInvincible() || m_IsDying) return;
     if (m_IsSuper)
     {
         m_IsSuper = false;
         SetImage("player_idle");
         m_LastSafePos = {700.0f, -120.0f};
     }
-    m_lives--;
-    if (m_lives>0)
-    {
-        SetPosition(m_LastSafePos);
-        m_Velocity={0.0f, 0.0f};
-        m_InvincibleTimer=2.0f;
-    }
-    else
-    {
-        LOG_INFO("Game over");
-    }
+    m_IsDying = true;
+    m_Velocity = {0.0f, 12.0f}; // 死亡瞬間給予向上的初速度 (小跳躍)
+    m_DeathCount++;
+    SetImage("player_dead");
+}
+void Player::Respawn()
+{
+    m_IsDying = false; // 解除死亡狀態
+
+    m_Velocity = {0.0f, 0.0f};
+    m_InvincibleTimer = 2.0f;   // 給予無敵時間
+    SetImage("player_idle");    // 換回正常站立圖片
+
 }
 void Player::Bounce()
 {

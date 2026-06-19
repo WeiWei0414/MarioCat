@@ -24,7 +24,13 @@ public:
     void Die();
     void PowerUp();
     [[nodiscard]] bool IsSuper() const { return m_IsSuper; }
+    bool IsDying() const { return m_IsDying; }
+    int GetDeathCount() const { return m_DeathCount; }
+    // 🌟 新增：把原本 Die 裡面的「復活傳送」邏輯獨立出來
+    void Respawn();
 private:
+    bool m_IsDying = false;
+    int m_DeathCount = 0;
     float m_speed=5.0f;
     int m_lives=5;
     float m_InvincibleTimer = 0.0f; // 無敵時間計時器

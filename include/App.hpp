@@ -59,7 +59,8 @@ private:
     int m_DeathPipeTimer = 0;
     int m_HorizClearPipePhase = 0; // 🌟 0: 未觸發, 1: 走入水管中
     int m_HorizClearPipeTimer = 0;
-
+    int m_DeathTimer = 0;
+    std::shared_ptr<Util::GameObject> m_DeathTextUI;
     template<typename T>
     void RenderWithCamera(const std::vector<std::shared_ptr<T>>& objects, float cameraX, float zoom) {
         for (auto& obj : objects) {
