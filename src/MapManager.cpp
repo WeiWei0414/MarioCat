@@ -413,6 +413,13 @@ LevelDate MapManager::LoadMap(const std::string& filePath)
                         level.blocks.push_back(block);
                         break;
                     }
+                case 101:
+                    {
+                        auto block = std::make_shared<EventBlock>("straght2",tileID);
+                        block->SetPosition({startX + (col * BLOCK_SIZE), startY - (row * BLOCK_SIZE)});
+                        level.blocks.push_back(block);
+                        break;
+                    }
                 default:
                     {
                         auto block = std::make_shared<Block>("brick_6");

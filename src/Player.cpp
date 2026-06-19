@@ -32,7 +32,7 @@ bool Player::IfCollidesWithBlock(const std::shared_ptr<Block>& block) const
     if (!isOverlapping) return false; // 如果連 AABB 都沒碰到，直接回傳 false
     auto eventBlock = std::dynamic_pointer_cast<EventBlock>(block);
     if (eventBlock) {
-        std::vector<int> ghostIDs = {84,85,99}; // 如果未來加了新幽靈陷阱，直接改成 {101, 102, 105} 就可以了！
+        std::vector<int> ghostIDs = {84,85,99,100}; // 如果未來加了新幽靈陷阱，直接改成 {101, 102, 105} 就可以了！
 
         // 2. 去陣列裡面找，看看當前碰到的方塊 ID 有沒有在名單裡
         int currentID = eventBlock->GetEventID();

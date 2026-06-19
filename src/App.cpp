@@ -523,13 +523,75 @@ if (m_FlagAnimPhase > 0) {
         }
         else if (m_FlagAnimPhase == 2) {
             // --- 階段 2：往右走向城堡 ---
-            pos.x += 3.0f;
-            m_FlagAnimTimer++;
+            if (m_IsFakeFlagTriggered) {
+                for (auto& block : m_Blocks) {
+                    auto eb = std::dynamic_pointer_cast<EventBlock>(block);
+                    if (eb && eb->GetEventID() == 101) {
 
-            // 走大約 90 幀的距離後，停下來
-            if (m_FlagAnimTimer > 90) {
-                m_FlagAnimPhase = 3; // 🌟 進入階段 3 (停留)
-                m_FlagAnimTimer = 0;
+                        glm::vec2 flagPos = eb->GetPosition();
+                        glm::vec2 pPos = m_Player->GetPosition();
+                        glm::vec2 bSize = eb->GetScaledSize();
+
+                        // 1. X 軸衝刺：101 號以高速 (15.0f) 衝向貓咪！
+                        float dir = (pPos.x < flagPos.x) ? -1.0f : 1.0f;
+                        flagPos.x += dir * 15.0f;
+
+                        // 2. 🌟 Y 軸重力系統：讓暴走的 101 號也能掉進坑洞！
+                        if (m_BlockVelocityY.count(eb) == 0) m_BlockVelocityY[eb] = 0.0f;
+                        m_BlockVelocityY[eb] -= 0.5f; // 重力下墜
+                        flagPos.y += m_BlockVelocityY[eb];
+
+                        // 3. 🌟 地板碰撞偵測
+                        for (const auto& ground : m_Blocks) {
+                            if (ground == eb) continue;
+
+                            auto groundEb = std::dynamic_pointer_cast<EventBlock>(ground);
+                            if (groundEb) {
+                                int id = groundEb->GetEventID();
+                                // 忽略幽靈方塊與陷阱感應器
+                                if (id == 84 || id == 85 || id == 99 || id == 100 || id == 101 || id == 47) continue;
+                            }
+
+                            glm::vec2 gPos = ground->GetPosition();
+                            glm::vec2 gSize = ground->GetScaledSize();
+                            bool colX = std::abs(flagPos.x - gPos.x) < ((bSize.x + gSize.x) / 2.0f);
+                            bool colY = std::abs(flagPos.y - gPos.y) < ((bSize.y + gSize.y) / 2.0f);
+
+                            // 如果撞到地板，就停在地板上
+                            if (colX && colY && m_BlockVelocityY[eb] < 0.0f) {
+                                flagPos.y = gPos.y + (gSize.y / 2.0f) + (bSize.y / 2.0f);
+                                m_BlockVelocityY[eb] = 0.0f;
+                                break;
+                            }
+                        }
+
+                        // 更新 101 號最新座標
+                        eb->SetPosition(flagPos);
+
+                        // 4. AABB 撞擊玩家判定
+                        glm::vec2 pSize = m_Player->GetScaledSize();
+                        bool hitX = std::abs(pPos.x - flagPos.x) <= ((pSize.x + bSize.x) / 2.0f);
+                        bool hitY = std::abs(pPos.y - flagPos.y) <= ((pSize.y + bSize.y) / 2.0f);
+
+                        if (hitX && hitY) {
+                            m_Player->Die();
+                            m_FlagAnimPhase = 0;
+                            return;
+                        }
+                    }
+                }
+            }
+            // ==========================================
+            // 🌟 安全通關：往右走向城堡
+            // ==========================================
+            else {
+                pos.x += 3.0f;
+                m_FlagAnimTimer++;
+
+                if (m_FlagAnimTimer > 90) {
+                    m_FlagAnimPhase = 3;
+                    m_FlagAnimTimer = 0;
+                }
             }
         }
         else if (m_FlagAnimPhase == 3) {
@@ -1001,44 +1063,154 @@ if (m_FlagAnimPhase > 0) {
 
             }
         }
-        if (eventBlock && eventBlock->GetEventID() == 99 && m_FlagAnimPhase == 0)
+        if (eventBlock && eventBlock->GetEventID() == 101 && m_FlagAnimPhase == 0)
         {
             glm::vec2 pPos = m_Player->GetPosition();
             glm::vec2 bPos = eventBlock->GetPosition();
             glm::vec2 pSize = m_Player->GetScaledSize();
             glm::vec2 bSize = eventBlock->GetScaledSize();
 
-            // 🌟 核心記憶體：記住貓咪上一刻到底在左邊還是右邊！
+            // 1. 判定玩家是否碰到 101 號 (加大容錯抓取側邊碰撞)
+            bool touchX = std::abs(pPos.x - bPos.x) <= ((pSize.x + bSize.x) / 2.0f) + 6.0f;
+            bool touchY = std::abs(pPos.y - bPos.y) <= ((pSize.y + bSize.y) / 2.0f) + 2.0f;
+
+            bool isRiding = false;
+
+            if (touchX && touchY)
+            {
+                float playerBottomY = pPos.y - (pSize.y / 2.0f);
+                float blockTopY = bPos.y + (bSize.y / 2.0f);
+
+                // 🌟 核心修正：將「死亡判定」與「騎乘判定」徹底分開！
+                // 只要玩家的腳底高於旗桿頂部 (給予 10.0f 容錯抵銷物理下陷)，就是【絕對安全區】！
+                bool is_above_block = playerBottomY >= (blockTopY - 10.0f);
+
+                if (is_above_block) {
+
+                    // --- 玩家在頭頂安全區 ---
+                    // 只有「對齊 X 軸」且「沒有往上跳 (y <= 0)」才進入「騎乘跟車模式」
+                    bool is_alignedX = std::abs(pPos.x - bPos.x) <= ((pSize.x + bSize.x) / 2.0f) + 2.0f;
+
+                    if (is_alignedX && m_Player->GetVelocity().y <= 0.0f) {
+                        isRiding = true;
+                        if (!eventBlock->HasSpawned()) {
+                            LOG_INFO("成功踩在 101 號旗桿頂部！啟動移動機制！");
+                            eventBlock->SetSpawned(true);
+                        }
+                    }
+                    // 💡 如果玩家此時按下空白鍵跳躍 (Velocity.y > 0) 或往旁邊走，
+                    // 程式會直接跳過這裡，什麼事都不會發生，完美安全離開！
+
+                } else {
+                    // --- 玩家在致命區 (腳底低於頂部，代表碰到側面或底下了) ---
+                    LOG_INFO("碰到 101 號實體旗桿側邊，被當場刺死！");
+                    m_Player->Die();
+                }
+            }
+
+            // 2. 🌟 物理系統：賦予 101 號重力下墜與地板碰撞能力
+            float oldBX = bPos.x;
+            float oldBY = bPos.y;
+
+            if (m_BlockVelocityY.count(eventBlock) == 0) m_BlockVelocityY[eventBlock] = 0.0f;
+            m_BlockVelocityY[eventBlock] -= 0.5f; // 套用重力下墜
+            bPos.y += m_BlockVelocityY[eventBlock];
+
+            // 掃描地圖上的普通方塊，當作 101 號的地板
+            for (const auto& ground : m_Blocks) {
+                if (ground == eventBlock) continue;
+
+                auto eb = std::dynamic_pointer_cast<EventBlock>(ground);
+                if (eb) {
+                    int id = eb->GetEventID();
+                    // 忽略幽靈方塊與陷阱感應器
+                    if (id == 84 || id == 85 || id == 99 || id == 100 || id == 101 || id == 47) continue;
+                }
+
+                glm::vec2 gPos = ground->GetPosition();
+                glm::vec2 gSize = ground->GetScaledSize();
+                bool colX = std::abs(bPos.x - gPos.x) < ((bSize.x + gSize.x) / 2.0f);
+                bool colY = std::abs(bPos.y - gPos.y) < ((bSize.y + gSize.y) / 2.0f);
+
+                if (colX && colY && m_BlockVelocityY[eventBlock] < 0.0f) {
+                    bPos.y = gPos.y + (gSize.y / 2.0f) + (bSize.y / 2.0f);
+                    m_BlockVelocityY[eventBlock] = 0.0f;
+                    break;
+                }
+            }
+
+            // 3. 移動邏輯：如果已被觸發，緩慢向 100 號靠近
+            if (eventBlock->HasSpawned()) {
+                float targetX = bPos.x;
+                for (auto& checkBlock : m_Blocks) {
+                    auto eb = std::dynamic_pointer_cast<EventBlock>(checkBlock);
+                    if (eb && eb->GetEventID() == 100) {
+                        targetX = eb->GetPosition().x;
+                        break;
+                    }
+                }
+                float distance = targetX - bPos.x;
+                if (distance > 40.0f) {
+                    float moveX = 2.0f;
+                    if (targetX - (bPos.x + moveX) < 40.0f) {
+                        moveX = targetX - 40.0f - bPos.x;
+                    }
+                    bPos.x += moveX;
+                }
+            }
+
+            // 4. 更新旗桿最新座標
+            eventBlock->SetPosition(bPos);
+
+            // 5. 核心防呆：帶著玩家一起平移與下墜！
+            if (isRiding) {
+                float deltaX = bPos.x - oldBX;
+                float deltaY = bPos.y - oldBY;
+                glm::vec2 catPos = m_Player->GetPosition();
+                catPos.x += deltaX;
+                catPos.y += deltaY;
+                m_Player->SetPosition(catPos);
+            }
+        }
+
+        // ==========================================
+        // 🌟 99號與100號：真正的過關旗桿 (單向穿透)
+        // ==========================================
+        if (eventBlock && (eventBlock->GetEventID() == 99 || eventBlock->GetEventID() == 100) && m_FlagAnimPhase == 0)
+        {
+            glm::vec2 pPos = m_Player->GetPosition();
+            glm::vec2 bPos = eventBlock->GetPosition();
+            glm::vec2 pSize = m_Player->GetScaledSize();
+            glm::vec2 bSize = eventBlock->GetScaledSize();
+
             static bool wasOnLeft = true;
+            if (pPos.x < bPos.x - (bSize.x / 2.0f) - 5.0f) wasOnLeft = true;
+            else if (pPos.x > bPos.x + (bSize.x / 2.0f) + 5.0f) wasOnLeft = false;
 
-            // 如果貓咪完全退到旗桿左邊安全區，就記住它在左邊
-            if (pPos.x < bPos.x - (bSize.x / 2.0f) - 5.0f) {
-                wasOnLeft = true;
-            }
-            // 如果貓咪完全退到旗桿右邊安全區，就記住它在右邊
-            else if (pPos.x > bPos.x + (bSize.x / 2.0f) + 5.0f) {
-                wasOnLeft = false;
-            }
-
-            // 算觸碰範圍 (因為步驟1已經把物理推擠拔掉了，容錯值用正常的 2.0f 即可)
             bool touchX = std::abs(pPos.x - bPos.x) <= ((pSize.x + bSize.x) / 2.0f) + 2.0f;
             bool touchY = std::abs(pPos.y - bPos.y) <= ((pSize.y + bSize.y) / 2.0f) + 2.0f;
 
-            // 🌟 只有當貓咪碰到旗桿，而且是「從左邊來的 (wasOnLeft)」，才觸發動畫！
             if (touchX && touchY && wasOnLeft)
             {
-                LOG_INFO("觸發過關旗桿！");
+                LOG_INFO("觸發過關旗桿！開始下滑！");
                 m_FlagAnimPhase = 1;
-
-                // 惡意判定：貓咪的 Y 座標如果大於旗桿的 Y 座標
                 m_IsTrollFlagDeath = (pPos.y > bPos.y);
                 m_FlagBottomY = bPos.y - (bSize.y / 2.0f) + (pSize.y / 2.0f);
-
-                // 吸附到左側邊緣
                 float snapX = bPos.x - (bSize.x / 2.0f) - (pSize.x / 2.0f);
-
                 m_Player->SetPosition({snapX, pPos.y});
 
+                m_IsFakeFlagTriggered = false; // 預設為安全通關
+
+                // 🌟 核心連動：如果是摸到 100 號，立刻檢查 101 解除了沒！
+                if (eventBlock->GetEventID() == 100) {
+                    for (auto& b : m_Blocks) {
+                        auto eb = std::dynamic_pointer_cast<EventBlock>(b);
+                        // 如果地圖上有 101，且它還沒被踩過 (!HasSpawned)
+                        if (eb && eb->GetEventID() == 101 && !eb->HasSpawned()) {
+                            m_IsFakeFlagTriggered = true; // 完了，啟動 101 追殺劇本！
+                        }
+                    }
+                }
             }
         }
         if (eventBlock && eventBlock->GetEventID() == 91)
@@ -1516,6 +1688,7 @@ void App::LoadLevel(int level) {
     m_FireballInterval = 120;
     m_PlatformInitialPos.clear();
     m_PlatformAngles.clear();
+    m_BlockVelocityY.clear();
 
 
     // 2. 組合新的地圖路徑 (把 level 變成字串放進檔名)
@@ -1554,11 +1727,13 @@ void App::LoadLevel(int level) {
     m_PipeAnimPhase = 0;
     m_HorizPipePhase = 0;
     m_ClearPipePhase = 0;
-    m_DeathPipePhase = 0; // 🌟 關鍵新增
+    m_DeathPipePhase = 0;
     m_DeathPipeTimer = 0;
-    m_HorizClearPipePhase = 0; // 🌟 關鍵新增：橫向通關重置
+    m_HorizClearPipePhase = 0;
     m_HorizClearPipeTimer = 0;
-    // (如果你還有其他的全域陷阱開關，記得要在這裡歸零)
+    m_IsFakeFlagTriggered = false;
+
+
 }
 void App::End() {
     LOG_TRACE("End");

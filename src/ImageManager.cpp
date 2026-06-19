@@ -38,6 +38,7 @@ void ImageManager::LoadAll()
     s_Images["mushroom_3"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/mushroom_3.png");
     s_Images["player_powerup"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/player_powerup.png");
     s_Images["straght"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/straght.png");
+    s_Images["straght2"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/straght2.png");
     s_Images["end"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/end.png");
     s_Images["spiky_teki"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/spiky_teki.png");
     s_Images["spike"]= std::make_shared<Util::Image>(RESOURCE_DIR "/character/spike.png");
